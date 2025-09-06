@@ -187,7 +187,7 @@ namespace RedisResp.Tests
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Error disconnecting: {ex.Message}");
+                Console.WriteLine($"[ERROR] Error disconnecting: {ex.Message}");
             }
             finally
             {

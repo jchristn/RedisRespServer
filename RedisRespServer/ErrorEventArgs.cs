@@ -18,19 +18,19 @@ namespace RedisResp
         /// Gets or sets the error message describing what went wrong.
         /// </summary>
         /// <value>A human-readable description of the error.</value>
-        public string Message { get; set; }
+        public string? Message { get; set; }
 
         /// <summary>
         /// Gets or sets the exception that caused the error, if any.
         /// </summary>
         /// <value>The underlying exception, or null if no exception was thrown.</value>
-        public Exception Exception { get; set; }
+        public Exception? Exception { get; set; }
 
         /// <summary>
         /// Gets or sets the identifier of the client associated with the error.
         /// </summary>
         /// <value>The client ID if the error is client-specific, or null for server-wide errors.</value>
-        public string ClientId { get; set; }
+        public string? ClientId { get; set; }
 
         #endregion
     }
