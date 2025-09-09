@@ -1,3 +1,5 @@
+<img src="https://github.com/jchristn/redisrespserver/blob/main/assets/logo.png?raw=true" width="256" height="256">
+
 # RedisRespServer
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
