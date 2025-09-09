@@ -15,6 +15,8 @@ namespace Redish.Server.Utilities
     /// </remarks>
     public static class PerformanceMetrics
     {
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+
         private static readonly object _Lock = new object();
         private static DateTime _LastCpuTime = DateTime.MinValue;
         private static TimeSpan _LastProcessorTime = TimeSpan.Zero;
@@ -353,5 +355,7 @@ namespace Redish.Server.Utilities
             }
             return 0.0;
         }
+
+#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
     }
 }

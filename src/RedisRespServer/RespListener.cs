@@ -231,7 +231,6 @@ namespace RedisResp
         /// </summary>
         public Action<SeverityEnum, string> Logger { get; set; } = null;
 
-        private string _Header = "[RespListener] ";
         private int _Port = 6379;
         private TcpListener _TcpListener;
         private bool _IsListening;
