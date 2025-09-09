@@ -1,0 +1,29 @@
+{
+  "EnableConsole": true,
+  "Port": 6379,
+  "Logging": {
+    "Servers": [
+      {
+        "Hostname": "127.0.0.1",
+        "Port": 514,
+        "RandomizePorts": false,
+        "MinimumPort": 65000,
+        "MaximumPort": 65535
+      }
+    ],
+    "LogDirectory": "./logs/",
+    "LogFilename": "./redish.log",
+    "ConsoleLogging": true,
+    "EnableColors": true,
+    "MinimumSeverity": 0
+  },
+  "Storage": {
+    "Mode": "Ram"
+  },
+  "RedisCompatibilityVersion": "7.0.0",
+  "DatabaseCount": 16,
+  "ReplicationBacklogSize": 1048576,
+  "SentinelDownAfterMilliseconds": 30000,
+  "SlaveReadOnly": true,
+  "ServerId": "f0a4f4b6a48e4d16bd56823ff18da842"
+}

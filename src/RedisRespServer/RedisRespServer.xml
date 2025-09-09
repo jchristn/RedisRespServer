@@ -1,0 +1,1380 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>RedisRespServer</name>
+    </assembly>
+    <members>
+        <member name="T:RedisResp.ClientConnectedEventArgs">
+            <summary>
+            Provides data for events raised when a client connects to the server.
+            </summary>
+            <remarks>
+            This event argument class contains information about a newly connected client,
+            including the unique client identifier, remote endpoint, and connection timestamp.
+            It is used by the ClientConnected event in the RespListener.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.ClientConnectedEventArgs.GUID">
+            <summary>
+            Gets or sets the unique identifier for the connected client.
+            </summary>
+            <value>A GUID uniquely identifying the client session.</value>
+        </member>
+        <member name="P:RedisResp.ClientConnectedEventArgs.RemoteEndPoint">
+            <summary>
+            Gets or sets the remote endpoint information of the connected client.
+            </summary>
+            <value>The IP address and port of the client connection.</value>
+        </member>
+        <member name="P:RedisResp.ClientConnectedEventArgs.ConnectedUtc">
+            <summary>
+            Gets or sets the timestamp when the client connected.
+            </summary>
+            <value>The UTC timestamp of the connection establishment.</value>
+        </member>
+        <member name="T:RedisResp.ClientDisconnectedEventArgs">
+            <summary>
+            Provides data for events raised when a client disconnects from the server.
+            </summary>
+            <remarks>
+            This event argument class contains information about a disconnected client,
+            including the client identifier, reason for disconnection, remote endpoint, and disconnection timestamp.
+            It is used by the ClientDisconnected event in the RespListener.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.ClientDisconnectedEventArgs.GUID">
+            <summary>
+            Gets or sets the unique identifier of the disconnected client.
+            </summary>
+            <value>The GUID that identified the client session.</value>
+        </member>
+        <member name="P:RedisResp.ClientDisconnectedEventArgs.Reason">
+            <summary>
+            Gets or sets the reason for the client disconnection.
+            </summary>
+            <value>A descriptive string explaining why the client disconnected.</value>
+        </member>
+        <member name="P:RedisResp.ClientDisconnectedEventArgs.RemoteEndPoint">
+            <summary>
+            Gets or sets the remote endpoint information of the disconnected client.
+            </summary>
+            <value>The IP address and port of the client connection.</value>
+        </member>
+        <member name="P:RedisResp.ClientDisconnectedEventArgs.DisconnectedAt">
+            <summary>
+            Gets or sets the timestamp when the client disconnected.
+            </summary>
+            <value>The UTC timestamp of the disconnection.</value>
+        </member>
+        <member name="T:RedisResp.ClientInfo">
+            <summary>
+            Contains information about a connected client.
+            </summary>
+            <remarks>
+            This class stores all relevant information about a client connection,
+            including the unique identifier, TCP client connection, and remote endpoint.
+            It is used internally by RespListener for client management.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.ClientInfo.GUID">
+            <summary>
+            Gets or sets the unique identifier for the client.
+            </summary>
+            <value>A GUID uniquely identifying the client session.</value>
+        </member>
+        <member name="P:RedisResp.ClientInfo.TcpClient">
+            <summary>
+            Gets or sets the TCP client connection.
+            </summary>
+            <value>The underlying TcpClient connection.</value>
+        </member>
+        <member name="P:RedisResp.ClientInfo.RemoteEndPoint">
+            <summary>
+            Gets or sets the remote endpoint information of the client.
+            </summary>
+            <value>The IP address and port of the client connection.</value>
+        </member>
+        <member name="P:RedisResp.ClientInfo.ConnectedUtc">
+            <summary>
+            Gets or sets the timestamp when the client connected.
+            </summary>
+            <value>The UTC timestamp of the connection establishment.</value>
+        </member>
+        <member name="P:RedisResp.ClientInfo.Name">
+            <summary>
+            Gets or sets the client name as set by the CLIENT SETNAME command.
+            </summary>
+            <value>The name assigned to the client, or null if no name has been set.</value>
+        </member>
+        <member name="M:RedisResp.ClientInfo.#ctor(System.Guid,System.Net.Sockets.TcpClient,System.Net.IPEndPoint)">
+            <summary>
+            Initializes a new instance of the <see cref="T:RedisResp.ClientInfo"/> class.
+            </summary>
+            <param name="guid">The unique identifier for the client.</param>
+            <param name="tcpClient">The TCP client connection.</param>
+            <param name="remoteEndPoint">The remote endpoint of the client.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when tcpClient or remoteEndPoint is null.</exception>
+            <remarks>
+            Creates a new client info instance with the specified connection details.
+            The connected timestamp is automatically set to the current UTC time.
+            </remarks>
+        </member>
+        <member name="T:RedisResp.ErrorEventArgs">
+            <summary>
+            Provides data for events raised when an error occurs in the server.
+            </summary>
+            <remarks>
+            This event argument class contains information about server or client errors,
+            including the error message, underlying exception, and associated client ID if applicable.
+            It is used by the ErrorOccurred event in the RespListener.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.ErrorEventArgs.Message">
+            <summary>
+            Gets or sets the error message describing what went wrong.
+            </summary>
+            <value>A human-readable description of the error.</value>
+        </member>
+        <member name="P:RedisResp.ErrorEventArgs.Exception">
+            <summary>
+            Gets or sets the exception that caused the error, if any.
+            </summary>
+            <value>The underlying exception, or null if no exception was thrown.</value>
+        </member>
+        <member name="P:RedisResp.ErrorEventArgs.GUID">
+            <summary>
+            Gets or sets the identifier of the client associated with the error.
+            </summary>
+            <value>The client GUID if the error is client-specific, or null for server-wide errors.</value>
+        </member>
+        <member name="T:RedisResp.RedisValue">
+            <summary>
+            Base class for all Redis value types.
+            </summary>
+        </member>
+        <member name="P:RedisResp.RedisValue.Type">
+            <summary>
+            Gets the type of this Redis value.
+            </summary>
+        </member>
+        <member name="P:RedisResp.RedisValue.ExpiresAt">
+            <summary>
+            Gets or sets the expiration time for this value.
+            </summary>
+            <value>The expiration time in UTC, or null if no expiration is set.</value>
+        </member>
+        <member name="P:RedisResp.RedisValue.IsExpired">
+            <summary>
+            Gets a value indicating whether this value has expired.
+            </summary>
+            <value>True if the value has expired; otherwise, false.</value>
+        </member>
+        <member name="M:RedisResp.RedisValue.GetTtl">
+            <summary>
+            Gets the Time To Live (TTL) for this value in seconds.
+            </summary>
+            <returns>The TTL in seconds, -1 if no expiration is set, or -2 if expired.</returns>
+        </member>
+        <member name="M:RedisResp.RedisValue.SetExpiration(System.Int32)">
+            <summary>
+            Sets the expiration time for this value.
+            </summary>
+            <param name="seconds">The number of seconds until expiration.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when seconds is negative.</exception>
+        </member>
+        <member name="M:RedisResp.RedisValue.RemoveExpiration">
+            <summary>
+            Removes the expiration time from this value.
+            </summary>
+        </member>
+        <member name="T:RedisResp.RedisValueType">
+            <summary>
+            Enumeration of Redis value types.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.String">
+            <summary>
+            String value type.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.Hash">
+            <summary>
+            Hash value type.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.List">
+            <summary>
+            List value type.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.Set">
+            <summary>
+            Set value type.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.SortedSet">
+            <summary>
+            Sorted set value type.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.Json">
+            <summary>
+            JSON value type.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RedisValueType.Stream">
+            <summary>
+            Stream value type.
+            </summary>
+        </member>
+        <member name="T:RedisResp.RespDataReceivedEventArgs">
+            <summary>
+            Provides data for events raised when RESP data is received.
+            </summary>
+            <remarks>
+            This event argument class contains all the information about a received RESP protocol message,
+            including the parsed data type, the actual value, raw protocol data, and timestamp.
+            It is used by all RESP data type events in the RespListener.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.DataType">
+            <summary>
+            Gets or sets the type of RESP data that was received.
+            </summary>
+            <value>The RESP data type enumeration value.</value>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.Value">
+            <summary>
+            Gets or sets the parsed value of the received data.
+            </summary>
+            <value>
+            The parsed data value. Type varies based on DataType:
+            - SimpleString/Error: string
+            - Integer: long or string (if parsing failed)
+            - BulkString: string
+            - Array: object with Length and Data properties
+            - Null: null
+            </value>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.RawData">
+            <summary>
+            Gets or sets the raw RESP protocol data as received.
+            </summary>
+            <value>The unparsed raw data string including RESP protocol markers.</value>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.Timestamp">
+            <summary>
+            Gets or sets the timestamp when the data was received.
+            </summary>
+            <value>The UTC timestamp of when the data was processed.</value>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.ClientGUID">
+            <summary>
+            Gets or sets the unique identifier of the client that sent the data.
+            </summary>
+            <value>The GUID of the client that sent the RESP data.</value>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.RawBytes">
+            <summary>
+            Gets or sets the raw binary data for bulk strings.
+            </summary>
+            <value>The original binary data before string conversion, used to preserve binary content.</value>
+            <remarks>This is only populated for BulkString data types to preserve binary data integrity.</remarks>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.MessageBytes">
+            <summary>
+            Gets or sets the complete unmolested message bytes as received from the network.
+            </summary>
+            <value>The original binary message data including all RESP protocol markers and terminators.</value>
+            <remarks>Contains the complete raw message bytes for all data types, useful for protocol analysis and debugging.</remarks>
+        </member>
+        <member name="P:RedisResp.RespDataReceivedEventArgs.ProtocolVersion">
+            <summary>
+            Gets or sets the RESP protocol version used to parse this message.
+            </summary>
+            <value>The RESP protocol version (RESP2 or RESP3) that was used to parse this message.</value>
+            <remarks>
+            This indicates which protocol parsing logic was used for this message.
+            RESP2 supports basic data types, while RESP3 includes enhanced data types.
+            </remarks>
+        </member>
+        <member name="T:RedisResp.RespDataType">
+            <summary>
+            Represents the different data types supported by the Redis Serialization Protocol (RESP).
+            </summary>
+            <remarks>
+            RESP is a serialization protocol used by Redis for client-server communication.
+            Each data type is identified by a specific first character in the protocol.
+            </remarks>
+        </member>
+        <member name="F:RedisResp.RespDataType.SimpleString">
+            <summary>
+            Simple string data type (prefix: +).
+            Used for simple status replies like "OK".
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Error">
+            <summary>
+            Error data type (prefix: -).
+            Used to represent error messages from the server.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Integer">
+            <summary>
+            Integer data type (prefix: :).
+            Used for signed 64-bit integers.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.BulkString">
+            <summary>
+            Bulk string data type (prefix: $).
+            Used for binary-safe strings with explicit length.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Array">
+            <summary>
+            Array data type (prefix: *).
+            Used for ordered collections of RESP elements.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Null">
+            <summary>
+            Null data type.
+            Represents null values in bulk strings or arrays.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Double">
+            <summary>
+            Double data type (prefix: ,).
+            Used for floating-point numbers in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Boolean">
+            <summary>
+            Boolean data type (prefix: #).
+            Used for true/false values in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.BigNumber">
+            <summary>
+            BigNumber data type (prefix: ().
+            Used for arbitrary precision numbers in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.BlobError">
+            <summary>
+            BlobError data type (prefix: !).
+            Used for binary-safe error messages in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.VerbatimString">
+            <summary>
+            VerbatimString data type (prefix: =).
+            Used for strings with encoding information in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Map">
+            <summary>
+            Map data type (prefix: %).
+            Used for key-value pairs in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Set">
+            <summary>
+            Set data type (prefix: ~).
+            Used for unordered collections in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Attribute">
+            <summary>
+            Attribute data type (prefix: |).
+            Used for metadata attributes in RESP3.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespDataType.Push">
+            <summary>
+            Push data type (prefix: >).
+            Used for server-initiated push messages in RESP3.
+            </summary>
+        </member>
+        <member name="T:RedisResp.RespInterface">
+            <summary>
+            Provides a higher-level interface for handling RESP protocol messages with both event-driven and functional approaches.
+            </summary>
+            <remarks>
+            This class wraps a RespListener instance and provides multiple ways to handle RESP protocol messages:
+            - Traditional event handlers (re-exposed from RespListener)
+            - Functional handlers using Func, Action, and EventHandler properties
+            This dual approach allows for flexible message handling based on application needs.
+            </remarks>
+        </member>
+        <member name="E:RedisResp.RespInterface.SimpleStringReceived">
+            <summary>
+            Raised when a simple string (prefix: +) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.ErrorReceived">
+            <summary>
+            Raised when an error message (prefix: -) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.IntegerReceived">
+            <summary>
+            Raised when an integer value (prefix: :) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.BulkStringReceived">
+            <summary>
+            Raised when a bulk string (prefix: $) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.ArrayReceived">
+            <summary>
+            Raised when an array (prefix: *) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.NullReceived">
+            <summary>
+            Raised when a null value is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.DataReceived">
+            <summary>
+            Raised when any RESP data is received from a client, regardless of type.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.ClientConnected">
+            <summary>
+            Raised when a new client connects to the server.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.ClientDisconnected">
+            <summary>
+            Raised when a client disconnects from the server.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.ErrorOccurred">
+            <summary>
+            Raised when an error occurs in the server or during client handling.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.DoubleReceived">
+            <summary>
+            Raised when a double value (prefix: ,) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.BooleanReceived">
+            <summary>
+            Raised when a boolean value (prefix: #) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.BigNumberReceived">
+            <summary>
+            Raised when a big number value (prefix: () is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.BlobErrorReceived">
+            <summary>
+            Raised when a blob error (prefix: !) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.VerbatimStringReceived">
+            <summary>
+            Raised when a verbatim string (prefix: =) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.MapReceived">
+            <summary>
+            Raised when a map (prefix: %) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.SetReceived">
+            <summary>
+            Raised when a set (prefix: ~) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.AttributeReceived">
+            <summary>
+            Raised when an attribute (prefix: |) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespInterface.PushReceived">
+            <summary>
+            Raised when a push message (prefix: >) is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="P:RedisResp.RespInterface.SimpleStringHandler">
+            <summary>
+            Gets or sets the functional handler for simple string messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ErrorHandler">
+            <summary>
+            Gets or sets the functional handler for error messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.IntegerHandler">
+            <summary>
+            Gets or sets the functional handler for integer messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BulkStringHandler">
+            <summary>
+            Gets or sets the functional handler for bulk string messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ArrayHandler">
+            <summary>
+            Gets or sets the functional handler for array messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.NullHandler">
+            <summary>
+            Gets or sets the functional handler for null messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.DataHandler">
+            <summary>
+            Gets or sets the functional handler for all data messages.
+            </summary>
+            <value>A function that takes RespDataReceivedEventArgs and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ClientConnectedAction">
+            <summary>
+            Gets or sets the action handler for client connection events.
+            </summary>
+            <value>An action that processes ClientConnectedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ClientDisconnectedAction">
+            <summary>
+            Gets or sets the action handler for client disconnection events.
+            </summary>
+            <value>An action that processes ClientDisconnectedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ErrorAction">
+            <summary>
+            Gets or sets the action handler for error events.
+            </summary>
+            <value>An action that processes ErrorEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.SimpleStringEventHandler">
+            <summary>
+            Gets or sets the event handler for simple string messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ErrorEventHandler">
+            <summary>
+            Gets or sets the event handler for error messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.IntegerEventHandler">
+            <summary>
+            Gets or sets the event handler for integer messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BulkStringEventHandler">
+            <summary>
+            Gets or sets the event handler for bulk string messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ArrayEventHandler">
+            <summary>
+            Gets or sets the event handler for array messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.NullEventHandler">
+            <summary>
+            Gets or sets the event handler for null messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.DataEventHandler">
+            <summary>
+            Gets or sets the event handler for all data messages.
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ClientConnectedEventHandler">
+            <summary>
+            Gets or sets the event handler for client connection events.
+            </summary>
+            <value>An EventHandler for ClientConnectedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ClientDisconnectedEventHandler">
+            <summary>
+            Gets or sets the event handler for client disconnection events.
+            </summary>
+            <value>An EventHandler for ClientDisconnectedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.ServerErrorEventHandler">
+            <summary>
+            Gets or sets the event handler for server error events.
+            </summary>
+            <value>An EventHandler for ErrorEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.DoubleHandler">
+            <summary>
+            Gets or sets the function handler for double values (RESP3).
+            </summary>
+            <value>A Func that processes double values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.DoubleAction">
+            <summary>
+            Gets or sets the action handler for double values (RESP3).
+            </summary>
+            <value>An Action that processes double values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.DoubleEventHandler">
+            <summary>
+            Gets or sets the event handler for double values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BooleanHandler">
+            <summary>
+            Gets or sets the function handler for boolean values (RESP3).
+            </summary>
+            <value>A Func that processes boolean values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BooleanAction">
+            <summary>
+            Gets or sets the action handler for boolean values (RESP3).
+            </summary>
+            <value>An Action that processes boolean values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BooleanEventHandler">
+            <summary>
+            Gets or sets the event handler for boolean values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BigNumberHandler">
+            <summary>
+            Gets or sets the function handler for big number values (RESP3).
+            </summary>
+            <value>A Func that processes big number values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BigNumberAction">
+            <summary>
+            Gets or sets the action handler for big number values (RESP3).
+            </summary>
+            <value>An Action that processes big number values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BigNumberEventHandler">
+            <summary>
+            Gets or sets the event handler for big number values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BlobErrorHandler">
+            <summary>
+            Gets or sets the function handler for blob error values (RESP3).
+            </summary>
+            <value>A Func that processes blob error values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BlobErrorAction">
+            <summary>
+            Gets or sets the action handler for blob error values (RESP3).
+            </summary>
+            <value>An Action that processes blob error values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.BlobErrorEventHandler">
+            <summary>
+            Gets or sets the event handler for blob error values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.VerbatimStringHandler">
+            <summary>
+            Gets or sets the function handler for verbatim string values (RESP3).
+            </summary>
+            <value>A Func that processes verbatim string values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.VerbatimStringAction">
+            <summary>
+            Gets or sets the action handler for verbatim string values (RESP3).
+            </summary>
+            <value>An Action that processes verbatim string values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.VerbatimStringEventHandler">
+            <summary>
+            Gets or sets the event handler for verbatim string values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.MapHandler">
+            <summary>
+            Gets or sets the function handler for map values (RESP3).
+            </summary>
+            <value>A Func that processes map values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.MapAction">
+            <summary>
+            Gets or sets the action handler for map values (RESP3).
+            </summary>
+            <value>An Action that processes map values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.MapEventHandler">
+            <summary>
+            Gets or sets the event handler for map values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.SetHandler">
+            <summary>
+            Gets or sets the function handler for set values (RESP3).
+            </summary>
+            <value>A Func that processes set values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.SetAction">
+            <summary>
+            Gets or sets the action handler for set values (RESP3).
+            </summary>
+            <value>An Action that processes set values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.SetEventHandler">
+            <summary>
+            Gets or sets the event handler for set values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.AttributeHandler">
+            <summary>
+            Gets or sets the function handler for attribute values (RESP3).
+            </summary>
+            <value>A Func that processes attribute values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.AttributeAction">
+            <summary>
+            Gets or sets the action handler for attribute values (RESP3).
+            </summary>
+            <value>An Action that processes attribute values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.AttributeEventHandler">
+            <summary>
+            Gets or sets the event handler for attribute values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.PushHandler">
+            <summary>
+            Gets or sets the function handler for push values (RESP3).
+            </summary>
+            <value>A Func that processes push values and returns a response string, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.PushAction">
+            <summary>
+            Gets or sets the action handler for push values (RESP3).
+            </summary>
+            <value>An Action that processes push values, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.PushEventHandler">
+            <summary>
+            Gets or sets the event handler for push values (RESP3).
+            </summary>
+            <value>An EventHandler for RespDataReceivedEventArgs, or null if no handler is set.</value>
+        </member>
+        <member name="P:RedisResp.RespInterface.Authenticate">
+            <summary>
+            Gets or sets the authentication function that is called when a client attempts to authenticate.
+            </summary>
+            <value>A function that takes username and password parameters and returns true if authentication succeeds, or null if no authentication is required.</value>
+            <remarks>
+            If this function is not set (null), all authentication attempts will be allowed by default.
+            The function receives the username (or null for password-only AUTH) and password as parameters.
+            Return true to allow the authentication, false to deny it.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.RespInterface.Listener">
+            <summary>
+            Gets the underlying RespListener instance.
+            </summary>
+            <value>The RespListener instance used for RESP protocol handling.</value>
+        </member>
+        <member name="M:RedisResp.RespInterface.#ctor(RedisResp.RespListener)">
+            <summary>
+            Initializes a new instance of the <see cref="T:RedisResp.RespInterface"/> class.
+            </summary>
+            <param name="listener">The RespListener instance to wrap and manage.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when listener is null.</exception>
+            <remarks>
+            Creates a new RespInterface that wraps the provided RespListener and subscribes
+            to all its events, providing both traditional event handling and functional handling approaches.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespInterface.Dispose">
+            <summary>
+            Releases all resources used by the <see cref="T:RedisResp.RespInterface"/>.
+            </summary>
+            <remarks>
+            This method disposes of the underlying RespListener and unsubscribes from all events.
+            After calling this method, the instance cannot be reused.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnSimpleStringReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles simple string received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the simple string information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnErrorReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles error received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the error information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnIntegerReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles integer received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the integer information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnBulkStringReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles bulk string received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the bulk string information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnArrayReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles array received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the array information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnNullReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles null received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the null value information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnDataReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles data received events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the received data information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnClientConnected(System.Object,RedisResp.ClientConnectedEventArgs)">
+            <summary>
+            Handles client connected events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the client connection information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnClientDisconnected(System.Object,RedisResp.ClientDisconnectedEventArgs)">
+            <summary>
+            Handles client disconnected events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the client disconnection information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnErrorOccurred(System.Object,RedisResp.ErrorEventArgs)">
+            <summary>
+            Handles error occurred events from the underlying RespListener.
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the error information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnDoubleReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles double received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the double information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnBooleanReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles boolean received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the boolean information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnBigNumberReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles big number received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the big number information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnBlobErrorReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles blob error received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the blob error information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnVerbatimStringReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles verbatim string received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the verbatim string information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnMapReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles map received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the map information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnSetReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles set received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the set information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnAttributeReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles attribute received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the attribute information.</param>
+        </member>
+        <member name="M:RedisResp.RespInterface.OnPushReceived(System.Object,RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Handles push received events from the underlying RespListener (RESP3).
+            </summary>
+            <param name="sender">The event sender.</param>
+            <param name="e">The event data containing the push information.</param>
+        </member>
+        <member name="T:RedisResp.RespListener">
+            <summary>
+            A TCP server that listens for and parses Redis Serialization Protocol (RESP) messages.
+            Provides event-driven notification for different types of RESP data and client connections.
+            </summary>
+            <remarks>
+            This class implements a multi-client TCP server that can parse RESP protocol messages
+            and raise appropriate events based on the data type received. It supports all standard
+            RESP data types including simple strings, errors, integers, bulk strings, arrays, and null values.
+            </remarks>
+        </member>
+        <member name="E:RedisResp.RespListener.SimpleStringReceived">
+            <summary>
+            Raised when a simple string (prefix: +) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.ErrorReceived">
+            <summary>
+            Raised when an error message (prefix: -) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.IntegerReceived">
+            <summary>
+            Raised when an integer value (prefix: :) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.BulkStringReceived">
+            <summary>
+            Raised when a bulk string (prefix: $) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.ArrayReceived">
+            <summary>
+            Raised when an array (prefix: *) is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.NullReceived">
+            <summary>
+            Raised when a null value is received from a client.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.DoubleReceived">
+            <summary>
+            Raised when a double value is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.BooleanReceived">
+            <summary>
+            Raised when a boolean value is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.BigNumberReceived">
+            <summary>
+            Raised when a big number value is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.BlobErrorReceived">
+            <summary>
+            Raised when a blob error is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.VerbatimStringReceived">
+            <summary>
+            Raised when a verbatim string is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.MapReceived">
+            <summary>
+            Raised when a map is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.SetReceived">
+            <summary>
+            Raised when a set is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.AttributeReceived">
+            <summary>
+            Raised when an attribute is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.PushReceived">
+            <summary>
+            Raised when a push message is received from a client (RESP3).
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.DataReceived">
+            <summary>
+            Raised when any RESP data is received from a client, regardless of type.
+            </summary>
+            <remarks>
+            This is a generic event that fires for all data types. Use this for logging
+            or monitoring all incoming data without subscribing to individual type events.
+            </remarks>
+        </member>
+        <member name="E:RedisResp.RespListener.ClientConnected">
+            <summary>
+            Raised when a new client connects to the server.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.ClientDisconnected">
+            <summary>
+            Raised when a client disconnects from the server.
+            </summary>
+        </member>
+        <member name="E:RedisResp.RespListener.ErrorOccurred">
+            <summary>
+            Raised when an error occurs in the server or during client handling.
+            </summary>
+        </member>
+        <member name="P:RedisResp.RespListener.IsListening">
+            <summary>
+            Gets a value indicating whether the server is currently listening for connections.
+            </summary>
+            <value>true if the server is listening; otherwise, false.</value>
+        </member>
+        <member name="P:RedisResp.RespListener.ConnectedClientsCount">
+            <summary>
+            Gets the current number of connected clients.
+            </summary>
+            <value>The count of active client connections.</value>
+            <remarks>This property is thread-safe.</remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.RetrieveClients">
+            <summary>
+            Gets information about all currently connected clients.
+            </summary>
+            <returns>An array of ClientInfo objects representing all connected clients.</returns>
+            <remarks>
+            This method returns a snapshot of all connected clients at the time of the call.
+            The returned array is thread-safe and will not be modified by the server.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.RetrieveClientByGuid(System.Guid)">
+            <summary>
+            Gets information about a specific client by its GUID.
+            </summary>
+            <param name="clientGuid">The GUID of the client to retrieve.</param>
+            <returns>The ClientInfo object for the specified client, or null if not found.</returns>
+            <remarks>
+            This method is thread-safe and returns null if the specified client is not connected.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.DisconnectClientByGuid(System.Guid)">
+            <summary>
+            Disconnects a specific client by its GUID.
+            </summary>
+            <param name="clientGuid">The GUID of the client to disconnect.</param>
+            <returns>true if the client was found and disconnected; otherwise, false.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when clientGuid is empty.</exception>
+            <remarks>
+            This method gracefully disconnects the specified client and removes it from
+            the connected clients collection. A ClientDisconnected event will be raised.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.RespListener.Logger">
+            <summary>
+            Method to invoke to send log messages.
+            </summary>
+        </member>
+        <member name="M:RedisResp.RespListener.#ctor(System.Int32)">
+            <summary>
+            Initializes a new instance of the <see cref="T:RedisResp.RespListener"/> class.
+            </summary>
+            <param name="port">The port number to listen on. Defaults to 6379 (standard Redis port).</param>
+            <remarks>
+            The server will listen on all available network interfaces (IPAddress.Any).
+            Call <see cref="M:RedisResp.RespListener.StartAsync(System.Threading.CancellationToken)"/> to begin accepting client connections.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.StartAsync(System.Threading.CancellationToken)">
+            <summary>
+            Starts the server and begins listening for client connections asynchronously.
+            </summary>
+            <param name="cancellationToken">Cancellation token.</param>
+            <returns>A task representing the asynchronous start operation.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown if the server is already listening.</exception>
+            <exception cref="T:System.Net.Sockets.SocketException">Thrown if the port is already in use or other socket errors occur.</exception>
+            <remarks>
+            This method starts the TCP listener and begins accepting client connections in the background.
+            The method returns immediately after starting the listener; client connections are handled asynchronously.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.Stop">
+            <summary>
+            Stops the server and disconnects all clients.
+            </summary>
+            <remarks>
+            This method stops accepting new connections, closes all existing client connections,
+            and stops the TCP listener. All connected clients will be disconnected gracefully.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.Dispose">
+            <summary>
+            Releases all resources used by the <see cref="T:RedisResp.RespListener"/>.
+            </summary>
+            <remarks>
+            This method stops the server if it's running and disposes of the TCP listener.
+            After calling this method, the instance cannot be reused.
+            </remarks>
+        </member>
+        <member name="M:RedisResp.RespListener.OnSimpleStringReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.SimpleStringReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the simple string information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnErrorReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.ErrorReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the error information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnIntegerReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.IntegerReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the integer information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnBulkStringReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.BulkStringReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the bulk string information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnArrayReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.ArrayReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the array information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnNullReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.NullReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the null value information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnDoubleReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.DoubleReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the double value information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnBooleanReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.BooleanReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the boolean value information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnBigNumberReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.BigNumberReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the big number value information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnBlobErrorReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.BlobErrorReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the blob error information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnVerbatimStringReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.VerbatimStringReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the verbatim string information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnMapReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.MapReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the map information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnSetReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.SetReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the set information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnAttributeReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.AttributeReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the attribute information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnPushReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.PushReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the push message information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnDataReceived(RedisResp.RespDataReceivedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.DataReceived"/> event.
+            </summary>
+            <param name="e">The event data containing the received data information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnClientConnected(RedisResp.ClientConnectedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.ClientConnected"/> event.
+            </summary>
+            <param name="e">The event data containing the client connection information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnClientDisconnected(RedisResp.ClientDisconnectedEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.ClientDisconnected"/> event.
+            </summary>
+            <param name="e">The event data containing the client disconnection information.</param>
+        </member>
+        <member name="M:RedisResp.RespListener.OnErrorOccurred(RedisResp.ErrorEventArgs)">
+            <summary>
+            Raises the <see cref="E:RedisResp.RespListener.ErrorOccurred"/> event.
+            </summary>
+            <param name="e">The event data containing the error information.</param>
+        </member>
+        <member name="T:RedisResp.RespParseResult">
+            <summary>
+            Represents the result of parsing a RESP message.
+            </summary>
+            <remarks>
+            This class encapsulates the parsed message data along with metadata about the parsing operation,
+            including the original raw data, the number of bytes consumed during parsing, and optionally
+            the raw bytes from bulk string content for binary data preservation.
+            </remarks>
+        </member>
+        <member name="P:RedisResp.RespParseResult.Message">
+            <summary>
+            Gets or sets the parsed message object.
+            </summary>
+            <value>The message object extracted from the RESP data, which can be a string, integer, array, or null.</value>
+        </member>
+        <member name="P:RedisResp.RespParseResult.RawData">
+            <summary>
+            Gets or sets the raw RESP data string.
+            </summary>
+            <value>The original RESP protocol string that was parsed.</value>
+        </member>
+        <member name="P:RedisResp.RespParseResult.RawBytes">
+            <summary>
+            Gets or sets the raw bytes from bulk string content.
+            </summary>
+            <value>The binary data extracted from bulk strings, or null if the message doesn't contain bulk string data.</value>
+        </member>
+        <member name="P:RedisResp.RespParseResult.BytesConsumed">
+            <summary>
+            Gets or sets the number of bytes consumed during parsing.
+            </summary>
+            <value>The count of bytes that were processed from the input buffer.</value>
+        </member>
+        <member name="M:RedisResp.RespParseResult.#ctor(System.Object,System.String,System.Int32,System.Byte[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:RedisResp.RespParseResult"/> class.
+            </summary>
+            <param name="message">The parsed message object.</param>
+            <param name="rawData">The raw RESP data string.</param>
+            <param name="bytesConsumed">The number of bytes consumed during parsing.</param>
+            <param name="rawBytes">The raw bytes from bulk string content.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when rawData is null.</exception>
+        </member>
+        <member name="T:RedisResp.RespVersionEnum">
+            <summary>
+            Represents the version of the Redis Serialization Protocol (RESP) used for a message.
+            </summary>
+            <remarks>
+            RESP2 is the original protocol version, while RESP3 introduces additional data types
+            and enhanced capabilities for modern Redis communication.
+            </remarks>
+        </member>
+        <member name="F:RedisResp.RespVersionEnum.RESP2">
+            <summary>
+            RESP2 protocol version (original).
+            Supports: SimpleString, Error, Integer, BulkString, Array, Null.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespVersionEnum.RESP3">
+            <summary>
+            RESP3 protocol version (enhanced).
+            Supports all RESP2 types plus: Double, Boolean, BigNumber, BlobError,
+            VerbatimString, Map, Set, Attribute, Push.
+            </summary>
+        </member>
+        <member name="T:RedisResp.SeverityEnum">
+            <summary>
+            Message severity.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Debug">
+            <summary>
+            Debug messages.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Info">
+            <summary>
+            Informational messages.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Warn">
+            <summary>
+            Warning messages.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Error">
+            <summary>
+            Error messages.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Alert">
+            <summary>
+            Alert messages.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Critical">
+            <summary>
+            Critical messages.
+            </summary>
+        </member>
+        <member name="F:RedisResp.SeverityEnum.Emergency">
+            <summary>
+            Emergency messages.
+            </summary>
+        </member>
+    </members>
+</doc>
