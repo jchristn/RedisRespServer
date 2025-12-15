@@ -6,7 +6,7 @@
 
 	<PropertyGroup>
 		<Title>Redis RESP Server</Title>
-		<Version>0.1.0</Version>
+		<Version>0.1.1</Version>
 		<ApplicationIcon>logo.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>RedisRespServer.xml</DocumentationFile>
@@ -23,6 +23,7 @@
 		<PackageReleaseNotes>Alpha release</PackageReleaseNotes>
 		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
 		<IncludeSymbols>True</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 	</PropertyGroup>
 
 	<ItemGroup>

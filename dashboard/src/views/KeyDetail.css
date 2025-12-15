@@ -1,0 +1,241 @@
+.key-detail {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.key-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.key-detail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.key-name {
+  font-size: 14px;
+  font-weight: 500;
+  word-break: break-all;
+  margin: 0;
+}
+
+.key-detail-meta {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.ttl-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.ttl-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.ttl-value {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.ttl-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ttl-input {
+  width: 100px;
+}
+
+.key-detail-value {
+  flex: 1;
+  overflow: auto;
+  margin-bottom: 16px;
+}
+
+.key-detail-footer {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* String */
+.string-value .code-block {
+  max-height: 300px;
+  overflow: auto;
+}
+
+.edit-string,
+.edit-json {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Hash */
+.hash-value .table {
+  font-size: 13px;
+}
+
+.add-field-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-field-form .input {
+  flex: 1;
+}
+
+/* List */
+.list-items {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.list-item:last-child {
+  border-bottom: none;
+}
+
+.list-index {
+  width: 40px;
+  color: var(--text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.list-item-value {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-item-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-item-form .input {
+  flex: 1;
+}
+
+/* Set */
+.set-members {
+  max-height: 300px;
+  overflow: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.set-member {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.add-member-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-member-form .input {
+  flex: 1;
+}
+
+/* Sorted Set */
+.zset-value .table {
+  font-size: 13px;
+}
+
+.add-zset-form {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.add-zset-form .input {
+  flex: 1;
+}
+
+.score-input {
+  width: 100px !important;
+  flex: none !important;
+}
+
+/* Stream */
+.stream-entries {
+  max-height: 400px;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+.stream-entry {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.stream-entry:last-child {
+  border-bottom: none;
+}
+
+.stream-entry-id {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--accent-color);
+}
+
+.stream-entry-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stream-field {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.field-name {
+  color: var(--text-muted);
+}

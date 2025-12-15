@@ -473,6 +473,13 @@
             string command = commandArgs[0].ToUpperInvariant();
             string response;
 
+            // Track client activity
+            if (_ClientInfos.TryGetValue(clientGuid, out ClientInfo activityInfo))
+            {
+                activityInfo.LastActivityUtc = DateTime.UtcNow;
+                activityInfo.LastCommand = command;
+            }
+
             try
             {
                 switch (command)
@@ -620,7 +627,7 @@
                         break;
 
                     case "SELECT":
-                        response = HandleSelectCommand(commandArgs);
+                        response = HandleSelectCommand(commandArgs, clientGuid);
                         break;
 
                     case "ROLE":
@@ -1234,10 +1241,132 @@
                     }
                     return "-ERR client not found\r\n";
 
+                case "GETNAME":
+                    if (_ClientInfos.TryGetValue(clientGuid, out ClientInfo nameInfo))
+                    {
+                        if (string.IsNullOrEmpty(nameInfo.Name))
+                        {
+                            _Logging.Debug(_Header + "executed: CLIENT GETNAME -> (nil)");
+                            return "$-1\r\n";
+                        }
+                        _Logging.Debug(_Header + $"executed: CLIENT GETNAME -> {nameInfo.Name}");
+                        return $"${nameInfo.Name.Length}\r\n{nameInfo.Name}\r\n";
+                    }
+                    return "-ERR client not found\r\n";
+
+                case "LIST":
+                    return HandleClientListCommand();
+
+                case "INFO":
+                    return HandleClientInfoCommand(clientGuid);
+
                 default:
                     _Logging.Warn(_Header + $"unknown CLIENT subcommand: {subCommand}");
                     return $"-ERR unknown subcommand '{subCommand}'\r\n";
             }
+        }
+
+        private string HandleClientListCommand()
+        {
+            var sb = new System.Text.StringBuilder();
+
+            foreach (var kvp in _ClientInfos)
+            {
+                Guid guid = kvp.Key;
+                ClientInfo clientInfo = kvp.Value;
+
+                // Try to get additional connection info from RespListener
+                RedisResp.ClientInfo? respClientInfo = _Resp.Listener.RetrieveClientByGuid(guid);
+                string addr = respClientInfo?.RemoteEndPoint?.ToString() ?? "unknown:0";
+
+                // Calculate age and idle time in seconds
+                long age = (long)(DateTime.UtcNow - clientInfo.ConnectedAt).TotalSeconds;
+                long idle = (long)(DateTime.UtcNow - clientInfo.LastActivityUtc).TotalSeconds;
+
+                // Build the client info line in Redis format
+                // Format: id=<id> addr=<addr> name=<name> age=<age> idle=<idle> flags=<flags> db=<db> sub=<sub> psub=<psub> ...
+                sb.Append($"id={clientInfo.ClientId} ");
+                sb.Append($"addr={addr} ");
+                sb.Append($"name={clientInfo.Name ?? ""} ");
+                sb.Append($"age={age} ");
+                sb.Append($"idle={idle} ");
+                sb.Append($"flags=N ");  // N = normal
+                sb.Append($"db={clientInfo.SelectedDatabase} ");
+                sb.Append($"sub=0 ");
+                sb.Append($"psub=0 ");
+                sb.Append($"multi=-1 ");
+                sb.Append($"resp={GetRespVersionNumber(clientInfo.RespVersion)} ");
+                if (!string.IsNullOrEmpty(clientInfo.LibraryName))
+                {
+                    sb.Append($"lib-name={clientInfo.LibraryName} ");
+                }
+                if (!string.IsNullOrEmpty(clientInfo.LibraryVersion))
+                {
+                    sb.Append($"lib-ver={clientInfo.LibraryVersion} ");
+                }
+                if (!string.IsNullOrEmpty(clientInfo.LastCommand))
+                {
+                    sb.Append($"cmd={clientInfo.LastCommand} ");
+                }
+                sb.Append('\n');
+            }
+
+            string result = sb.ToString().TrimEnd('\n');
+            _Logging.Debug(_Header + $"executed: CLIENT LIST -> {_ClientInfos.Count} clients");
+            return $"${result.Length}\r\n{result}\r\n";
+        }
+
+        private string HandleClientInfoCommand(Guid clientGuid)
+        {
+            if (!_ClientInfos.TryGetValue(clientGuid, out ClientInfo clientInfo))
+            {
+                return "-ERR client not found\r\n";
+            }
+
+            RedisResp.ClientInfo? respClientInfo = _Resp.Listener.RetrieveClientByGuid(clientGuid);
+            string addr = respClientInfo?.RemoteEndPoint?.ToString() ?? "unknown:0";
+
+            long age = (long)(DateTime.UtcNow - clientInfo.ConnectedAt).TotalSeconds;
+            long idle = (long)(DateTime.UtcNow - clientInfo.LastActivityUtc).TotalSeconds;
+
+            var sb = new System.Text.StringBuilder();
+            sb.Append($"id={clientInfo.ClientId} ");
+            sb.Append($"addr={addr} ");
+            sb.Append($"name={clientInfo.Name ?? ""} ");
+            sb.Append($"age={age} ");
+            sb.Append($"idle={idle} ");
+            sb.Append($"flags=N ");
+            sb.Append($"db={clientInfo.SelectedDatabase} ");
+            sb.Append($"sub=0 ");
+            sb.Append($"psub=0 ");
+            sb.Append($"multi=-1 ");
+            sb.Append($"resp={GetRespVersionNumber(clientInfo.RespVersion)} ");
+            if (!string.IsNullOrEmpty(clientInfo.LibraryName))
+            {
+                sb.Append($"lib-name={clientInfo.LibraryName} ");
+            }
+            if (!string.IsNullOrEmpty(clientInfo.LibraryVersion))
+            {
+                sb.Append($"lib-ver={clientInfo.LibraryVersion} ");
+            }
+            if (!string.IsNullOrEmpty(clientInfo.LastCommand))
+            {
+                sb.Append($"cmd={clientInfo.LastCommand} ");
+            }
+
+            string result = sb.ToString().TrimEnd();
+            _Logging.Debug(_Header + $"executed: CLIENT INFO -> {result}");
+            return $"${result.Length}\r\n{result}\r\n";
+        }
+
+        private int GetRespVersionNumber(RespVersionEnum version)
+        {
+            return version switch
+            {
+                RespVersionEnum.RESP2 => 2,
+                RespVersionEnum.RESP3 => 3,
+                _ => 2
+            };
         }
 
         private string HandleConfigCommand(string[] commandArgs)
@@ -1264,8 +1393,9 @@
                             return "*2\r\n$15\r\nslave-read-only\r\n$2\r\nno\r\n";
                             
                         case "databases":
-                            _Logging.Debug(_Header + "executed: CONFIG GET databases -> 16");
-                            return "*2\r\n$9\r\ndatabases\r\n$2\r\n16\r\n";
+                            string dbCount = _Settings.DatabaseCount.ToString();
+                            _Logging.Debug(_Header + $"executed: CONFIG GET databases -> {dbCount}");
+                            return $"*2\r\n$9\r\ndatabases\r\n${dbCount.Length}\r\n{dbCount}\r\n";
                             
                         default:
                             _Logging.Debug(_Header + $"executed: CONFIG GET {parameter} -> (empty)");
@@ -1444,7 +1574,7 @@
             return "*0\r\n";
         }
 
-        private string HandleSelectCommand(string[] commandArgs)
+        private string HandleSelectCommand(string[] commandArgs, Guid clientGuid)
         {
             if (commandArgs.Length != 2)
             {
@@ -1456,17 +1586,21 @@
                 return "-ERR invalid DB index\r\n";
             }
 
-            // For basic compatibility, only support database 0
-            if (databaseIndex == 0)
+            // Check if the database index is within the configured range
+            if (databaseIndex >= _Settings.DatabaseCount)
             {
-                _Logging.Debug(_Header + $"executed: SELECT {databaseIndex} -> OK");
-                return "+OK\r\n";
-            }
-            else
-            {
-                _Logging.Debug(_Header + $"executed: SELECT {databaseIndex} -> ERR (only database 0 supported)");
+                _Logging.Debug(_Header + $"executed: SELECT {databaseIndex} -> ERR (out of range, max: {_Settings.DatabaseCount - 1})");
                 return "-ERR DB index is out of range\r\n";
             }
+
+            // Track the selected database for this client
+            if (_ClientInfos.TryGetValue(clientGuid, out ClientInfo clientInfo))
+            {
+                clientInfo.SelectedDatabase = databaseIndex;
+            }
+
+            _Logging.Debug(_Header + $"executed: SELECT {databaseIndex} -> OK");
+            return "+OK\r\n";
         }
 
         private string HandleRoleCommand(string[] commandArgs)

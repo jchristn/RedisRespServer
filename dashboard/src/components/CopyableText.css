@@ -1,0 +1,34 @@
+.copyable-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.copyable-text.truncate .copyable-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.copyable-value {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.copy-btn {
+  flex-shrink: 0;
+  padding: 2px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.5;
+  transition: opacity 0.2s;
+  border-radius: 4px;
+}
+
+.copy-btn:hover {
+  opacity: 1;
+  background-color: var(--bg-tertiary);
+}

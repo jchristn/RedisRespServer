@@ -1,0 +1,95 @@
+.keys-view {
+  height: calc(100vh - var(--topbar-height) - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.keys-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.db-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.db-select {
+  width: 100px;
+}
+
+.search-form {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-width: 300px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.key-count {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.keys-content {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.keys-list-container {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+}
+
+.keys-table {
+  border: none;
+  border-radius: 0;
+}
+
+.keys-table tbody tr {
+  cursor: pointer;
+}
+
+.keys-table tbody tr.selected {
+  background-color: var(--accent-light);
+}
+
+.key-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.key-detail-panel {
+  width: 400px;
+  flex-shrink: 0;
+  overflow: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-secondary);
+}
+
+@media (max-width: 1024px) {
+  .keys-content {
+    flex-direction: column;
+  }
+
+  .key-detail-panel {
+    width: 100%;
+    max-height: 50vh;
+  }
+}

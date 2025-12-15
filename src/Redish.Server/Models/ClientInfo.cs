@@ -50,6 +50,24 @@ namespace Redish.Server.Models
         public RespVersionEnum RespVersion { get; set; } = RespVersionEnum.RESP2;
 
         /// <summary>
+        /// Gets or sets the currently selected database index for this client.
+        /// </summary>
+        /// <value>The database index (default: 0).</value>
+        public int SelectedDatabase { get; set; } = 0;
+
+        /// <summary>
+        /// Gets or sets the time of the last interaction with this client.
+        /// </summary>
+        /// <value>The last activity timestamp in UTC.</value>
+        public DateTime LastActivityUtc { get; set; } = DateTime.UtcNow;
+
+        /// <summary>
+        /// Gets or sets the last command executed by this client.
+        /// </summary>
+        /// <value>The last command string or null if no command has been executed.</value>
+        public string? LastCommand { get; set; }
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="ClientInfo"/> class.
         /// </summary>
         /// <remarks>

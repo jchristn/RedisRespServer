@@ -1,0 +1,130 @@
+.console-view {
+  height: calc(100vh - var(--topbar-height) - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.console-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #1e1e1e;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+  min-height: 400px;
+}
+
+.console-output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  color: #d4d4d4;
+}
+
+.console-welcome {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #333;
+  color: #888;
+}
+
+.console-welcome p {
+  margin: 4px 0;
+}
+
+.console-entry {
+  margin-bottom: 8px;
+}
+
+.console-command {
+  display: flex;
+  gap: 8px;
+}
+
+.console-prompt {
+  color: var(--accent-color);
+  font-weight: bold;
+  user-select: none;
+}
+
+.console-cmd {
+  color: #fff;
+}
+
+.console-result {
+  color: #9cdcfe;
+  margin: 4px 0 4px 16px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.console-error {
+  color: #f14c4c;
+  margin: 4px 0 4px 16px;
+  white-space: pre-wrap;
+}
+
+.console-input-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background-color: #2d2d2d;
+  border-top: 1px solid #333;
+}
+
+.console-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}
+
+.console-input::placeholder {
+  color: #666;
+}
+
+.console-hints {
+  margin-top: 20px;
+  padding: 16px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.console-hints h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.hints-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hint-btn {
+  padding: 6px 12px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.hint-btn:hover {
+  background-color: var(--accent-light);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
