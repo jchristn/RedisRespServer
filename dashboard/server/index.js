@@ -1,12 +1,24 @@
 import express from 'express';
 import cors from 'cors';
 import Redis from 'ioredis';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import { existsSync } from 'fs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3002;
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from dist directory in production
+const distPath = join(__dirname, '..', 'dist');
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
 
 // Store Redis connections per session/connection string
 const connections = new Map();
@@ -590,6 +602,13 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
-  console.log(`Redish Dashboard API server running on http://localhost:${PORT}`);
+// Serve index.html for client-side routing (SPA fallback)
+if (existsSync(distPath)) {
+  app.get('*', (req, res) => {
+    res.sendFile(join(distPath, 'index.html'));
+  });
+}
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Redish Dashboard server running on http://0.0.0.0:${PORT}`);
 });
