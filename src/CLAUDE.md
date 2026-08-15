@@ -10,8 +10,16 @@ dotnet build
 ```
 
 ### Run the test suite
+Tests are defined once as framework-agnostic Touchstone descriptors in **Test.Shared** and can be run through any of three hosts:
 ```bash
-dotnet run --project RedisRespServer.Tests
+# Console runner (tabular output, non-zero exit on failure) - optionally pass a JSON results path
+dotnet run --project Test.Automated
+
+# xUnit adapter
+dotnet test Test.Xunit
+
+# NUnit adapter
+dotnet test Test.Nunit
 ```
 
 ### Clean build artifacts
@@ -35,11 +43,13 @@ This is a .NET 8.0 solution implementing a Redis RESP (Redis Serialization Proto
 - `RespDataType.cs` - Enum defining RESP data types (SimpleString, Error, Integer, BulkString, Array, Null)  
 - `EventArgs.cs` - Event argument classes for all RESP events and client connection events
 
-**RedisRespServer.Tests project** - Custom test suite containing:
-- `TestProgram.cs` - Console application entry point
-- `TestRunner.cs` - Orchestrates and executes all tests
-- `TestServer.cs` - Test wrapper around RespListener with comprehensive logging
-- `TestClient.cs` - TCP client for testing server functionality
+**Touchstone test projects** - Runner-agnostic test infrastructure:
+- `Test.Shared` - The single source of truth. Defines every test case as a Touchstone `TestSuiteDescriptor`/`TestCaseDescriptor` (no test-framework dependency). Covers the RedisRespServer library (RESP2/RESP3 parsing, negative/malformed input, listener lifecycle, client connections, RespInterface, stress) and the Redish.Server platform (model types, storage engine, and end-to-end command dispatch against an in-process server).
+- `Test.Automated` - Touchstone CLI/console runner over `Test.Shared`.
+- `Test.Xunit` - Touchstone xUnit adapter (one xUnit test per descriptor).
+- `Test.Nunit` - Touchstone NUnit adapter (one NUnit test per descriptor).
+
+**Interactive console apps** (kept for manual use, not automated tests): `Sample.RedisServer`, `Sample.RedisClient`, `Sample.RedisInterface`, and `Test.StackExchangeRedis` (interactive REPL against a running server).
 
 ### Key Architecture Details
 
@@ -47,7 +57,7 @@ This is a .NET 8.0 solution implementing a Redis RESP (Redis Serialization Proto
 - **Multi-client support**: Server handles multiple concurrent TCP connections with unique client IDs
 - **Asynchronous processing**: All network operations use async/await patterns
 - **Thread-safe**: Client collection and message logging use proper locking
-- **Custom test framework**: No external test dependencies - uses custom TestRunner instead of xUnit/NUnit
+- **Runner-agnostic tests**: Test logic lives once in `Test.Shared` (Touchstone descriptors) and runs unchanged via the console runner, xUnit, or NUnit
 
 ### RESP Protocol Support
 
@@ -61,10 +71,10 @@ The server parses and handles all standard RESP data types:
 
 ### Development Notes
 
-- Default listening port is 6379 (Redis standard), test server uses 6380
+- Default listening port is 6379 (Redis standard); integration tests bind to OS-assigned ephemeral ports to avoid collisions
 - Server uses event handlers for different RESP message types - subscribe to specific events based on needs
 - The project has nullable reference types enabled, generating warnings for uninitialized properties
-- Custom test runner provides interactive console output with timestamped logging and visual indicators
+- The Touchstone console runner (`Test.Automated`) provides tabular output with per-test timing and a pass/fail summary
 
 ## Code Style and Implementation Rules
 
