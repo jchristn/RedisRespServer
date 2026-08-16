@@ -53,6 +53,7 @@ namespace Test.Shared
 
                     // Redish.Server platform - end-to-end command dispatch (integration)
                     ServerCommandSuite.Build(),
+                    ServerCommandExtendedSuite.Build(),
                 };
             }
         }

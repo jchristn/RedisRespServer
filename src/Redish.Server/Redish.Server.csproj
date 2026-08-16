@@ -13,7 +13,7 @@
 
   <ItemGroup>
     <PackageReference Include="SerializationHelper" Version="2.0.3" />
-    <PackageReference Include="SyslogLogging" Version="2.0.8" />
+    <PackageReference Include="SyslogLogging" Version="2.2.1" />
   </ItemGroup>
 
 </Project>
