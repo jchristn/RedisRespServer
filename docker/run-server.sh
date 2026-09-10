@@ -8,4 +8,4 @@ docker run -it --rm \
   -p 6379:6379 \
   -v "$(pwd)/redish.json:/app/redish.json" \
   -v "$(pwd)/logs:/app/logs" \
-  jchristn/redish:%1
+  jchristn77/redish:%1

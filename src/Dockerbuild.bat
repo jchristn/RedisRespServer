@@ -1,8 +1,14 @@
 @ECHO OFF
 IF "%1" == "" GOTO :Usage
 ECHO.
-ECHO Building for linux/amd64 and linux/arm64/v8...
-docker buildx build -f Redish.Server/Dockerfile --builder cloud-viewio-assistant-builder --platform linux/amd64,linux/arm64/v8 --tag jchristn/redish:%1 --push .
+ECHO Building for linux/amd64 and linux/arm64/v8 and pushing to Docker Hub...
+docker buildx build -f Redish.Server/Dockerfile --builder cloud-jchristn77-jchristn77 --platform linux/amd64,linux/arm64/v8 --tag jchristn77/redish:%1 --tag jchristn77/redish:latest --push .
+IF ERRORLEVEL 1 GOTO :Done
+
+ECHO.
+ECHO Pulling images into the local repository...
+docker pull jchristn77/redish:%1
+docker pull jchristn77/redish:latest
 
 GOTO :Done
 

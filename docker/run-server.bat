@@ -7,4 +7,4 @@ docker run -it --rm ^
   -p 6379:6379 ^
   -v "%cd%\redish.json:/app/redish.json" ^
   -v "%cd%\logs:/app/logs" ^
-  jchristn/redish:%1
+  jchristn77/redish:%1
