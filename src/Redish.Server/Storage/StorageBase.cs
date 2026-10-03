@@ -2,11 +2,13 @@
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using RedisResp;
     using Redish.Server.Models;
+    using Redish.Server.Telemetry;
 
     /// <summary>
     /// Abstract base class for Redis storage implementations.
@@ -467,19 +469,64 @@
             if (_Disposed)
                 return;
 
+            // Telemetry stages: queued (timer fired, waiting for a pool thread), snapshot (copy the key list),
+            // evict (check and remove expired keys). Failures were previously unobserved; they are now recorded.
+            long firedTimestamp = Stopwatch.GetTimestamp();
+            RedishInstrumentation.SweepStarted();
+
             await Task.Run(() =>
             {
-                List<string> keys = GetAllKeys().ToList();
-                foreach (string key in keys)
+                long runStartTimestamp = Stopwatch.GetTimestamp();
+                long snapshotEndTimestamp = 0;
+                long scanned = 0;
+                long expired = 0;
+                Exception? failure = null;
+
+                try
                 {
-                    RedisValue value;
-                    if (TryGetValue(key, out value) && value.IsExpired)
+                    List<string> keys = GetAllKeys().ToList();
+                    snapshotEndTimestamp = Stopwatch.GetTimestamp();
+
+                    foreach (string key in keys)
                     {
-                        RedisValue removedValue;
-                        TryRemove(key, out removedValue);
+                        scanned++;
+                        RedisValue value;
+                        if (TryGetValueForSweep(key, out value) && value.IsExpired)
+                        {
+                            RedisValue removedValue;
+                            if (TryRemove(key, out removedValue)) expired++;
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+                finally
+                {
+                    RedishInstrumentation.SweepCompleted(
+                        firedTimestamp,
+                        runStartTimestamp,
+                        snapshotEndTimestamp,
+                        Stopwatch.GetTimestamp(),
+                        scanned,
+                        expired,
+                        failure);
+                }
             });
+        }
+
+        /// <summary>
+        /// Looks up a key on behalf of the expiration sweep. Implementations whose <see cref="TryGetValue(string, out RedisValue)"/>
+        /// removes expired entries as a side effect should override this to return the raw entry, so the sweep
+        /// (not the lookup) accounts for the removal.
+        /// </summary>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">The stored value, including expired values.</param>
+        /// <returns>True if the key is present.</returns>
+        protected virtual bool TryGetValueForSweep(string key, out RedisValue value)
+        {
+            return TryGetValue(key, out value);
         }
 
         /// <summary>

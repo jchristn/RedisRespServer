@@ -2,6 +2,7 @@ namespace RedisResp
 {
     using System;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.IO;
     using System.Linq;
     using System.Net;
@@ -269,6 +270,7 @@ namespace RedisResp
 
             _TcpListener.Start();
             _IsListening = true;
+            RespInstrumentation.ListenerStarted();
 
             Log(SeverityEnum.Info, $"redis listener started on port {_Port}");
 
@@ -287,6 +289,7 @@ namespace RedisResp
             if (!_IsListening) return;
 
             _IsListening = false;
+            RespInstrumentation.ListenerStopped();
             _TcpListener?.Stop();
 
             // Disconnect all clients
@@ -442,6 +445,9 @@ namespace RedisResp
 
         private async Task AcceptClientsAsync(CancellationToken cancellationToken = default)
         {
+            // Each dispatched message starts its own trace; never inherit the caller's ambient span.
+            Activity.Current = null;
+
             while (_IsListening)
             {
                 try
@@ -455,6 +461,8 @@ namespace RedisResp
                     {
                         _Clients[clientGuid] = clientInfo;
                     }
+
+                    RespInstrumentation.ConnectionAccepted();
 
                     OnClientConnected(new ClientConnectedEventArgs
                     {
@@ -472,6 +480,8 @@ namespace RedisResp
                 }
                 catch (Exception ex)
                 {
+                    if (_IsListening) RespInstrumentation.AcceptFailed(ex);
+
                     OnErrorOccurred(new ErrorEventArgs
                     {
                         Message = "Error accepting client",
@@ -486,6 +496,10 @@ namespace RedisResp
             byte[] buffer = new byte[4096];
             StringBuilder dataBuffer = new StringBuilder();
             List<byte> rawByteBuffer = new List<byte>(); // Preserve raw bytes
+            long connectionStart = Stopwatch.GetTimestamp();
+            string closeReason = RespTelemetry.CloseClientClosed;
+            bool parseErrorReported = false;
+            Exception clientException = null;
 
             try
             {
@@ -496,6 +510,8 @@ namespace RedisResp
                     {
                         int bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
                         if (bytesRead == 0) break;
+
+                        RespInstrumentation.BytesRead(bytesRead);
 
                         // Store raw bytes
                         for (int i = 0; i < bytesRead; i++)
@@ -509,17 +525,26 @@ namespace RedisResp
                         dataBuffer.Append(data);
 
                         // Process complete RESP messages
-                        await ProcessRespData(clientGuid, dataBuffer, rawByteBuffer, cancellationToken).ConfigureAwait(false);
+                        bool unparseable = await ProcessRespData(clientGuid, dataBuffer, rawByteBuffer, cancellationToken).ConfigureAwait(false);
+                        if (unparseable && !parseErrorReported)
+                        {
+                            // Reported once per connection: the buffer stays stuck on the same bytes until the client disconnects.
+                            parseErrorReported = true;
+                            RespInstrumentation.ParseFailed(RespTelemetry.ErrorUnknownPrefix);
+                        }
                     }
                 }
             }
             catch (IOException ioEx) when (ioEx.InnerException is SocketException)
             {
                 // Client disconnected - this is normal, don't log as an error
+                closeReason = RespTelemetry.CloseClientReset;
                 Log(SeverityEnum.Warn, $"client {clientGuid} disconnected");
             }
             catch (Exception ex)
             {
+                closeReason = RespTelemetry.CloseError;
+                clientException = ex;
                 OnErrorOccurred(new ErrorEventArgs
                 {
                     Message = "Error handling client",
@@ -529,10 +554,23 @@ namespace RedisResp
             }
             finally
             {
+                bool stillTracked;
                 lock (_ClientsLock)
                 {
-                    _Clients.Remove(clientGuid);
+                    stillTracked = _Clients.Remove(clientGuid);
                 }
+
+                if (!stillTracked)
+                {
+                    // Removed by DisconnectClientByGuid or Stop before this loop ended.
+                    closeReason = _IsListening ? RespTelemetry.CloseServerDisconnect : RespTelemetry.CloseServerShutdown;
+                }
+                else if (closeReason == RespTelemetry.CloseError)
+                {
+                    RespInstrumentation.ClientFailed(clientException);
+                }
+
+                RespInstrumentation.ConnectionClosed(closeReason, connectionStart);
 
                 OnClientDisconnected(new ClientDisconnectedEventArgs
                 {
@@ -543,11 +581,12 @@ namespace RedisResp
             }
         }
 
-        private async Task ProcessRespData(Guid clientGuid, StringBuilder dataBuffer, List<byte> rawByteBuffer, CancellationToken cancellationToken = default)
+        private async Task<bool> ProcessRespData(Guid clientGuid, StringBuilder dataBuffer, List<byte> rawByteBuffer, CancellationToken cancellationToken = default)
         {
             var data = dataBuffer.ToString();
             int processedChars = 0;
             int processedBytes = 0;
+            bool unparseable = false;
 
             while (processedChars < data.Length)
             {
@@ -556,7 +595,8 @@ namespace RedisResp
 
                 if (parseResult == null)
                 {
-                    // Not enough data to parse complete message yet
+                    // Not enough data to parse complete message yet, unless the leading byte is not a RESP type prefix
+                    unparseable = remainingData.Length > 0 && !IsRespPrefix(remainingData[0]);
                     break;
                 }
 
@@ -583,6 +623,32 @@ namespace RedisResp
             if (processedBytes > 0)
             {
                 rawByteBuffer.RemoveRange(0, processedBytes);
+            }
+
+            return unparseable;
+        }
+
+        private static bool IsRespPrefix(char c)
+        {
+            switch (c)
+            {
+                case '+':
+                case '-':
+                case ':':
+                case '$':
+                case '*':
+                case ',':
+                case '#':
+                case '(':
+                case '!':
+                case '=':
+                case '%':
+                case '~':
+                case '|':
+                case '>':
+                    return true;
+                default:
+                    return false;
             }
         }
 
@@ -921,6 +987,12 @@ namespace RedisResp
                 MessageBytes = messageBytes
             };
 
+            long dispatchStart = Stopwatch.GetTimestamp();
+            Activity activity = RespInstrumentation.StartDispatch();
+            if (activity != null) TagDispatchActivity(activity, clientGuid);
+            bool matched = false;
+            Exception dispatchException = null;
+
             try
             {
                 if (message == null)
@@ -929,6 +1001,7 @@ namespace RedisResp
                     eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                     eventArgs.Value = null;
                     OnNullReceived(eventArgs);
+                    matched = true;
                 }
                 else if (message is string stringMessage)
                 {
@@ -938,6 +1011,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                         eventArgs.Value = stringMessage;
                         OnSimpleStringReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("-"))
                     {
@@ -945,6 +1019,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                         eventArgs.Value = stringMessage;
                         OnErrorReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("$"))
                     {
@@ -952,6 +1027,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                         eventArgs.Value = stringMessage;
                         OnBulkStringReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("="))
                     {
@@ -959,6 +1035,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                         eventArgs.Value = stringMessage;
                         OnVerbatimStringReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("("))
                     {
@@ -966,6 +1043,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                         eventArgs.Value = stringMessage;
                         OnBigNumberReceived(eventArgs);
+                        matched = true;
                     }
                 }
                 else if (message is double doubleMessage)
@@ -974,6 +1052,7 @@ namespace RedisResp
                     eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                     eventArgs.Value = doubleMessage;
                     OnDoubleReceived(eventArgs);
+                    matched = true;
                 }
                 else if (message is bool boolMessage)
                 {
@@ -981,6 +1060,7 @@ namespace RedisResp
                     eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                     eventArgs.Value = boolMessage;
                     OnBooleanReceived(eventArgs);
+                    matched = true;
                 }
                 else if (message is long || (message is string && long.TryParse((string)message, out _)))
                 {
@@ -988,6 +1068,7 @@ namespace RedisResp
                     eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                     eventArgs.Value = message;
                     OnIntegerReceived(eventArgs);
+                    matched = true;
                 }
                 else if (message is object[] arrayData)
                 {
@@ -997,6 +1078,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                         eventArgs.Value = arrayData;
                         OnArrayReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("%"))
                     {
@@ -1004,6 +1086,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                         eventArgs.Value = arrayData;
                         OnMapReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("~"))
                     {
@@ -1011,6 +1094,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                         eventArgs.Value = arrayData;
                         OnSetReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith("|"))
                     {
@@ -1018,6 +1102,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                         eventArgs.Value = arrayData;
                         OnAttributeReceived(eventArgs);
+                        matched = true;
                     }
                     else if (rawData.StartsWith(">"))
                     {
@@ -1025,6 +1110,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                         eventArgs.Value = arrayData;
                         OnPushReceived(eventArgs);
+                        matched = true;
                     }
                     else
                     {
@@ -1032,6 +1118,7 @@ namespace RedisResp
                         eventArgs.ProtocolVersion = RespVersionEnum.RESP2;
                         eventArgs.Value = arrayData;
                         OnArrayReceived(eventArgs);
+                        matched = true;
                     }
                 }
                 else if (message != null && message.GetType().Name.Contains("Type") && message.ToString().Contains("BlobError"))
@@ -1040,18 +1127,62 @@ namespace RedisResp
                     eventArgs.ProtocolVersion = RespVersionEnum.RESP3;
                     eventArgs.Value = message;
                     OnBlobErrorReceived(eventArgs);
+                    matched = true;
                 }
             }
             catch (Exception ex)
             {
+                dispatchException = ex;
                 OnErrorOccurred(new ErrorEventArgs
                 {
                     Message = "Error dispatching RESP message",
                     Exception = ex
                 });
             }
+            finally
+            {
+                bool typed = matched || dispatchException != null;
+                string outcome = dispatchException != null
+                    ? RespTelemetry.OutcomeError
+                    : (matched ? RespTelemetry.OutcomeOk : RespTelemetry.OutcomeUnhandled);
+
+                RespInstrumentation.DispatchCompleted(
+                    activity,
+                    dispatchStart,
+                    typed ? eventArgs.DataType.ToString() : RespTelemetry.Unknown,
+                    typed ? eventArgs.ProtocolVersion.ToString() : RespTelemetry.Unknown,
+                    messageBytes != null ? messageBytes.Length : 0,
+                    outcome,
+                    dispatchException);
+
+                activity?.Dispose();
+            }
 
             await Task.CompletedTask.ConfigureAwait(false);
+        }
+
+        private void TagDispatchActivity(Activity activity, Guid clientGuid)
+        {
+            try
+            {
+                activity.SetTag(RespTelemetry.AttributeClientId, clientGuid.ToString());
+
+                ClientInfo clientInfo;
+                lock (_ClientsLock)
+                {
+                    _Clients.TryGetValue(clientGuid, out clientInfo);
+                }
+
+                if (clientInfo?.RemoteEndPoint != null)
+                {
+                    activity.SetTag(RespTelemetry.AttributeClientAddress, clientInfo.RemoteEndPoint.Address.ToString());
+                    activity.SetTag(RespTelemetry.AttributeClientPort, clientInfo.RemoteEndPoint.Port);
+                }
+            }
+            catch
+            {
+                // Best-effort span enrichment; never affects dispatch.
+            }
         }
 
 #pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously

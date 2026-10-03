@@ -1,0 +1,73 @@
+.external-services-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.external-service {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  background-color: var(--bg-tertiary);
+  border-radius: 6px;
+}
+
+.external-service-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.external-service-name {
+  font-weight: 600;
+  color: var(--accent-color);
+  text-decoration: none;
+}
+
+.external-service-name:hover {
+  text-decoration: underline;
+}
+
+.external-service-description {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.external-service-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
+.external-service-credentials {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.external-service-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.external-service-token {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.external-services-empty,
+.external-services-note {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.external-services-note {
+  margin-top: 4px;
+}

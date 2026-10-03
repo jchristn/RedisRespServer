@@ -35,4 +35,11 @@ export default [
       ],
     },
   },
+  {
+    // The backend (BFF) runs on Node.js
+    files: ['server/**/*.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ]

@@ -1,0 +1,24 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  # Prometheus 3 negotiates UTF-8 metric names by default, and the OpenTelemetry .NET exporter then
+  # exposes dotted names (redish.commands_total). Legacy validation requests the conventional
+  # underscore form (redish_commands_total) used by the dashboards, alerts, and TELEMETRY.md.
+  metric_name_validation_scheme: legacy
+
+scrape_configs:
+  # Redish server: Redish.Server + RedisRespServer meters and .NET runtime metrics (Radiant)
+  - job_name: 'redish'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['redish:9464']
+
+  # Dashboard backend: HTTP server, Redis integration, and Node.js runtime metrics
+  - job_name: 'redish-dashboard'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['dashboard:9465']
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

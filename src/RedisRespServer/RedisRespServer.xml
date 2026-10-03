@@ -397,6 +397,16 @@
             Used for server-initiated push messages in RESP3.
             </summary>
         </member>
+        <member name="T:RedisResp.RespInstrumentation">
+            <summary>
+            Internal holder for the library's meter, activity source, and instruments.
+            </summary>
+            <remarks>
+            Every recording method is best-effort: it never throws into the caller. When no listener is attached,
+            each call reduces to an enabled check and returns. Names come from <see cref="T:RedisResp.RespTelemetry"/>.
+            This class is thread safe.
+            </remarks>
+        </member>
         <member name="T:RedisResp.RespInterface">
             <summary>
             Provides a higher-level interface for handling RESP protocol messages with both event-driven and functional approaches.
@@ -1313,6 +1323,196 @@
             <param name="bytesConsumed">The number of bytes consumed during parsing.</param>
             <param name="rawBytes">The raw bytes from bulk string content.</param>
             <exception cref="T:System.ArgumentNullException">Thrown when rawData is null.</exception>
+        </member>
+        <member name="T:RedisResp.RespTelemetry">
+            <summary>
+            Stable public names for the telemetry emitted by the RedisRespServer library.
+            </summary>
+            <remarks>
+            The library emits metrics through a <see cref="T:System.Diagnostics.Metrics.Meter"/> and traces through an
+            <see cref="T:System.Diagnostics.ActivitySource"/>, both named <see cref="F:RedisResp.RespTelemetry.MeterName"/> /
+            <see cref="F:RedisResp.RespTelemetry.ActivitySourceName"/>. It takes no dependency on any exporter or SDK; emission is effectively
+            free until a host subscribes (for example with Radiant: <c>settings.Sources.AddMeter(RespTelemetry.MeterName)</c>
+            and <c>settings.Sources.AddActivitySource(RespTelemetry.ActivitySourceName)</c>).
+            These names are a public contract consumed by dashboards and alerts; they do not change between releases.
+            All label values are drawn from small, fixed sets. Identifiers and payloads are never placed on metrics.
+            This class is thread safe (it holds only constants).
+            </remarks>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.MeterName">
+            <summary>
+            Name of the meter used by the library: <c>RedisRespServer</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ActivitySourceName">
+            <summary>
+            Name of the activity source used by the library: <c>RedisRespServer</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ListenersActive">
+            <summary>
+            Up/down counter of listeners currently accepting connections. Unit <c>{listener}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ConnectionsActive">
+            <summary>
+            Up/down counter of client connections currently open. Unit <c>{connection}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ConnectionsAccepted">
+            <summary>
+            Counter of client connections accepted. Unit <c>{connection}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ConnectionsClosed">
+            <summary>
+            Counter of client connections closed, labeled by <see cref="F:RedisResp.RespTelemetry.AttributeCloseReason"/>. Unit <c>{connection}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ConnectionDuration">
+            <summary>
+            Histogram of client connection lifetimes, labeled by <see cref="F:RedisResp.RespTelemetry.AttributeCloseReason"/>. Unit <c>s</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AcceptErrors">
+            <summary>
+            Counter of failures accepting a client connection, labeled by <see cref="F:RedisResp.RespTelemetry.AttributeErrorType"/>. Unit <c>{error}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.BytesReceived">
+            <summary>
+            Counter of bytes read from client sockets. Unit <c>By</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.MessagesReceived">
+            <summary>
+            Counter of complete RESP messages parsed, labeled by <see cref="F:RedisResp.RespTelemetry.AttributeRespType"/> and
+            <see cref="F:RedisResp.RespTelemetry.AttributeRespProtocol"/>. Unit <c>{message}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.MessageSize">
+            <summary>
+            Histogram of complete RESP message sizes, labeled by <see cref="F:RedisResp.RespTelemetry.AttributeRespType"/>. Unit <c>By</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.DispatchDuration">
+            <summary>
+            Histogram of time spent dispatching one message to subscribers (event handlers run synchronously
+            inside this window), labeled by <see cref="F:RedisResp.RespTelemetry.AttributeRespType"/> and <see cref="F:RedisResp.RespTelemetry.AttributeOutcome"/>. Unit <c>s</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ParseErrors">
+            <summary>
+            Counter of input the parser could not interpret (for example an unknown type prefix), labeled by
+            <see cref="F:RedisResp.RespTelemetry.AttributeErrorType"/>. Unit <c>{error}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ClientErrors">
+            <summary>
+            Counter of unexpected errors on a client connection loop, labeled by <see cref="F:RedisResp.RespTelemetry.AttributeErrorType"/>. Unit <c>{error}</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.SpanDispatch">
+            <summary>
+            Prefix of the server span opened for every dispatched RESP message. The full span name is
+            <c>resp.dispatch {RespDataType}</c>, for example <c>resp.dispatch Array</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeRespType">
+            <summary>
+            RESP data type of a message (a <see cref="T:RedisResp.RespDataType"/> name, or <c>Unknown</c>).
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeRespProtocol">
+            <summary>
+            RESP protocol generation of a message: <c>RESP2</c>, <c>RESP3</c>, or <c>Unknown</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeOutcome">
+            <summary>
+            Outcome of an operation: <c>ok</c>, <c>error</c>, or <c>unhandled</c> (the message was parsed but matched no dispatch path).
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeCloseReason">
+            <summary>
+            Why a connection closed: <c>client_closed</c>, <c>client_reset</c>, <c>server_disconnect</c>,
+            <c>server_shutdown</c>, or <c>error</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeErrorType">
+            <summary>
+            OpenTelemetry <c>error.type</c>: an exception type name or a short fixed code such as <c>unknown_prefix</c>.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeClientId">
+            <summary>
+            Span-only attribute: the library-assigned client GUID. Never used as a metric label.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeMessageSize">
+            <summary>
+            Span-only attribute: the size of the message in bytes.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeClientAddress">
+            <summary>
+            Span-only attribute: the remote client address (OpenTelemetry <c>client.address</c>).
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.AttributeClientPort">
+            <summary>
+            Span-only attribute: the remote client port (OpenTelemetry <c>client.port</c>).
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.OutcomeOk">
+            <summary>
+            Outcome value for a successful operation.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.OutcomeError">
+            <summary>
+            Outcome value for a failed operation.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.OutcomeUnhandled">
+            <summary>
+            Outcome value for a message that was parsed but matched no dispatch path.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.CloseClientClosed">
+            <summary>
+            Close reason: the client closed the connection cleanly.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.CloseClientReset">
+            <summary>
+            Close reason: the connection was reset or aborted by the peer.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.CloseServerDisconnect">
+            <summary>
+            Close reason: the server disconnected the client explicitly.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.CloseServerShutdown">
+            <summary>
+            Close reason: the listener was stopped.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.CloseError">
+            <summary>
+            Close reason: an unexpected error ended the connection loop.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.ErrorUnknownPrefix">
+            <summary>
+            Parse error type: the message began with a byte that is not a RESP2 or RESP3 type prefix.
+            </summary>
+        </member>
+        <member name="F:RedisResp.RespTelemetry.Unknown">
+            <summary>
+            Label value used when a RESP type or protocol could not be determined.
+            </summary>
         </member>
         <member name="T:RedisResp.RespVersionEnum">
             <summary>

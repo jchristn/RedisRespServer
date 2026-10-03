@@ -22,6 +22,11 @@ dotnet test Test.Xunit
 dotnet test Test.Nunit
 ```
 
+### Dashboard backend tests
+```bash
+cd ../dashboard && npm test   # node --test over server/*.test.js (never point it at server/, which would start index.js)
+```
+
 ### Clean build artifacts
 ```bash
 dotnet clean
@@ -75,6 +80,21 @@ The server parses and handles all standard RESP data types:
 - Server uses event handlers for different RESP message types - subscribe to specific events based on needs
 - The project has nullable reference types enabled, generating warnings for uninitialized properties
 - The Touchstone console runner (`Test.Automated`) provides tabular output with per-test timing and a pass/fail summary
+
+## Telemetry
+
+See `../TELEMETRY.md` for the full catalog. Key rules when changing code:
+
+- Library (`RedisRespServer`): emit only through the BCL. Names live in `RespTelemetry` (public, stable); instruments and
+  best-effort recording helpers live in the internal `RespInstrumentation`. Never add an OpenTelemetry SDK or Radiant reference.
+- Redish.Server: names in `Telemetry/RedishTelemetry.cs`, instruments in `Telemetry/RedishInstrumentation.cs`, and the single
+  Radiant host in `Telemetry/RedishTelemetryHost.cs` (created in `Program.cs`, disposed on shutdown). New commands must be added
+  to the bounded operation list in `RedishInstrumentation`; otherwise they report as `UNKNOWN`.
+- Labels must be bounded. Ids, keys, values, and free-form text go on spans only, or nowhere. Recording must never throw.
+- Grafana dashboards in `../assets/grafana/` query Prometheus series names (`redish_commands_total`, and so on). Keep them
+  in sync when renaming anything, and keep `metric_name_validation_scheme: legacy` in `../docker/prometheus.yaml`.
+- Telemetry tests live in `Test.Shared/Suites/RespTelemetrySuite.cs` and `RedishTelemetrySuite.cs` (BCL listeners via
+  `Infrastructure/TelemetryCapture.cs`).
 
 ## Code Style and Implementation Rules
 

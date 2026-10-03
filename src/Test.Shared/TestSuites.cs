@@ -38,6 +38,7 @@ namespace Test.Shared
                     ClientConnectionSuite.Build(),
                     RespInterfaceSuite.Build(),
                     StressSuite.Build(),
+                    RespTelemetrySuite.Build(),
 
                     // Redish.Server platform - model types (unit)
                     StringValueSuite.Build(),
@@ -54,6 +55,9 @@ namespace Test.Shared
                     // Redish.Server platform - end-to-end command dispatch (integration)
                     ServerCommandSuite.Build(),
                     ServerCommandExtendedSuite.Build(),
+
+                    // Redish.Server platform - telemetry (metrics, spans, sweep job, Radiant host)
+                    RedishTelemetrySuite.Build(),
                 };
             }
         }

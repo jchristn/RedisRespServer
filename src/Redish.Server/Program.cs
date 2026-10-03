@@ -1,6 +1,7 @@
 namespace Redish.Server
 {
     using Redish.Server.Settings;
+    using Redish.Server.Telemetry;
     using SerializationHelper;
     using SyslogLogging;
     using System;
@@ -28,6 +29,7 @@ namespace Redish.Server
         private static ServerSettings _Settings = null;
         private static LoggingModule _Logging = null;
         private static RedishServer _Server = null;
+        private static RedishTelemetryHost _Telemetry = null;
         private static CancellationTokenSource _TokenSource = new CancellationTokenSource();
 
         public static async Task Main(string[] args)
@@ -55,6 +57,9 @@ namespace Redish.Server
             while (!waitHandleSignal);
 
             _Logging.Info(_Header + "stopping at " + DateTime.UtcNow);
+
+            try { _Server?.Dispose(); } catch (Exception e) { _Logging.Warn(_Header + "error stopping server: " + e.Message); }
+            _Telemetry?.Dispose();
         }
 
         private static void Welcome()
@@ -91,6 +96,20 @@ namespace Redish.Server
             }
             
             _Logging = new LoggingModule(syslogServers);
+
+            // Single telemetry host for the process; subscribes to the Redish.Server and RedisRespServer sources.
+            _Telemetry = RedishTelemetryHost.Start(_Settings.Telemetry, _Logging);
+            if (_Telemetry.IsActive)
+            {
+                _Logging.Info(_Header + "telemetry enabled, service " + _Settings.Telemetry.ServiceName
+                    + (_Settings.Telemetry.OtlpEnabled ? ", OTLP " + _Settings.Telemetry.OtlpEndpoint : "")
+                    + (_Telemetry.ScrapeUrl != null ? ", metrics " + _Telemetry.ScrapeUrl : ""));
+            }
+            else
+            {
+                _Logging.Info(_Header + "telemetry disabled");
+            }
+
             _Server = new RedishServer(_Settings, _Logging);
         }
 

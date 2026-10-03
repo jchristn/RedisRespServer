@@ -1,0 +1,40 @@
+{
+  "EnableConsole": true,
+  "Port": 6379,
+  "Logging": {
+    "Servers": [
+      {
+        "Hostname": "127.0.0.1",
+        "Port": 514,
+        "RandomizePorts": false,
+        "MinimumPort": 65000,
+        "MaximumPort": 65535
+      }
+    ],
+    "LogDirectory": "./logs/",
+    "LogFilename": "./redish.log",
+    "ConsoleLogging": true,
+    "EnableColors": true,
+    "MinimumSeverity": 0
+  },
+  "Storage": {
+    "Mode": "Ram"
+  },
+  "Telemetry": {
+    "Enabled": true,
+    "ServiceName": "redish-server",
+    "EnableMetrics": true,
+    "EnableTraces": true,
+    "EnableLogs": true,
+    "TraceSamplingRatio": 1.0,
+    "LogMinimumSeverity": 2,
+    "OtlpEnabled": true,
+    "OtlpEndpoint": "http://tempo:4317",
+    "OtlpProtocol": "grpc",
+    "PrometheusEnabled": true,
+    "PrometheusHostname": "redish",
+    "PrometheusPort": 9464,
+    "LokiEnabled": true,
+    "LokiEndpoint": "http://loki:3100/otlp"
+  }
+}

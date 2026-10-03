@@ -20,6 +20,23 @@
   "Storage": {
     "Mode": "Ram"
   },
+  "Telemetry": {
+    "Enabled": true,
+    "ServiceName": "redish-server",
+    "EnableMetrics": true,
+    "EnableTraces": true,
+    "EnableLogs": true,
+    "TraceSamplingRatio": 1.0,
+    "LogMinimumSeverity": 2,
+    "OtlpEnabled": true,
+    "OtlpEndpoint": "http://127.0.0.1:4317",
+    "OtlpProtocol": "grpc",
+    "PrometheusEnabled": true,
+    "PrometheusHostname": "127.0.0.1",
+    "PrometheusPort": 9464,
+    "LokiEnabled": false,
+    "LokiEndpoint": "http://127.0.0.1:3100/otlp"
+  },
   "RedisCompatibilityVersion": "7.0.0",
   "DatabaseCount": 16,
   "ReplicationBacklogSize": 1048576,

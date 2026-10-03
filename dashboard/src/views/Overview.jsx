@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
 import { formatBytes, formatUptime, formatNumber, parseRedisInfo } from '../utils/api';
+import ExternalServicesCard from '../components/ExternalServicesCard';
 import './Overview.css';
 
 export default function Overview() {
@@ -167,6 +168,9 @@ export default function Overview() {
           </div>
         </div>
       )}
+
+      {/* External services: Grafana and the observability stack (kept low on the page) */}
+      <ExternalServicesCard />
 
       {/* Raw Info (collapsible) */}
       {serverInfo && (

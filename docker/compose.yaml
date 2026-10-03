@@ -1,0 +1,178 @@
+# Redish with its observability stack: Prometheus (metrics), Tempo (traces), Loki (logs), Grafana.
+#
+#   docker compose -f docker/compose.yaml up -d --build
+#
+# Redish RESP          127.0.0.1:6379  (redis-cli -p 6379)
+# Redish metrics       http://localhost:9464/metrics
+# Dashboard            http://localhost:3002  (connect to "redish:6379" from the login page)
+# Dashboard metrics    http://localhost:9465/metrics
+# Grafana              http://localhost:3000  (admin / admin by default; set GRAFANA_ADMIN_PASSWORD outside local dev)
+# Prometheus           http://localhost:9090
+# Tempo                http://localhost:3200  (OTLP gRPC 4317, OTLP HTTP 4318)
+# Loki                 http://localhost:3100
+#
+# See TELEMETRY.md for the metric and span catalog and the dashboard map.
+
+# Explicit project name: without it Compose derives the name from the directory ("docker"), which
+# collides with any other stack that also keeps its compose file in a directory named docker/.
+name: redish
+
+services:
+
+  tempo:
+    container_name: 'redish-tempo'
+    # Pinned: later builds reject the standard ingester/compactor sections used in tempo.yaml.
+    image: 'grafana/tempo:2.6.1'
+    command: ['-config.file=/etc/tempo.yaml']
+    ports:
+      - '3200:3200'
+      - '4317:4317'
+      - '4318:4318'
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      - redish-tempo-data:/var/tempo
+    healthcheck:
+      # The tempo image ships wget (not curl); /ready returns 503 until ready, then 200.
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3200/ready || exit 1']
+      interval: 5s
+      timeout: 2s
+      retries: 2
+      start_period: 40s
+
+  loki:
+    container_name: 'redish-loki'
+    image: 'grafana/loki:3.2.1'
+    command: ['-config.file=/etc/loki/local-config.yaml']
+    ports:
+      - '3100:3100'
+    volumes:
+      - redish-loki-data:/loki
+    healthcheck:
+      # The loki image ships wget (not curl); /ready returns 200 once the ring is up.
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3100/ready || exit 1']
+      interval: 5s
+      timeout: 2s
+      retries: 2
+      start_period: 30s
+
+  redish:
+    container_name: 'redish-server'
+    image: 'jchristn77/redish:v0.1.1'
+    build:
+      context: ../src
+      dockerfile: Redish.Server/Dockerfile
+    ports:
+      - '6379:6379'
+      - '9464:9464'
+    volumes:
+      - ./redish.compose.json:/app/redish.json
+      - ./logs:/app/logs
+    depends_on:
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      # The RESP port is not HTTP; the in-process Prometheus endpoint doubles as the liveness probe. It binds
+      # the service's DNS name ("redish", see redish.compose.json) because the OpenTelemetry Prometheus
+      # listener rejects the "*" wildcard, so the probe addresses it by that name rather than 127.0.0.1.
+      test: ['CMD', 'curl', '-f', 'http://redish:9464/metrics']
+      interval: 5s
+      timeout: 2s
+      retries: 2
+      start_period: 15s
+
+  dashboard:
+    container_name: 'redish-dashboard'
+    image: 'jchristn77/redish-ui:v0.1.1'
+    build:
+      context: ../dashboard
+    ports:
+      - '3002:3002'
+      - '9465:9465'
+    environment:
+      OTEL_SERVICE_NAME: 'redish-dashboard'
+      OTEL_EXPORTER_OTLP_ENDPOINT: 'http://tempo:4318'
+      REDISH_DASHBOARD_METRICS_HOST: '0.0.0.0'
+      REDISH_DASHBOARD_METRICS_PORT: '9465'
+      # Browser-reachable links shown on the Overview page's External Services card
+      GRAFANA_URL: 'http://localhost:3000'
+      GRAFANA_USERNAME: '${GRAFANA_ADMIN_USER:-admin}'
+      GRAFANA_PASSWORD: '${GRAFANA_ADMIN_PASSWORD:-admin}'
+      PROMETHEUS_URL: 'http://localhost:9090'
+      TEMPO_URL: 'http://localhost:3200'
+      LOKI_URL: 'http://localhost:3100'
+      # Hidden: the Redish scrape endpoint answers only to the name "redish" (see TELEMETRY.md); use Prometheus.
+      REDISH_METRICS_URL: ''
+      DASHBOARD_METRICS_URL: 'http://localhost:9465/metrics'
+    depends_on:
+      redish:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://127.0.0.1:3002/api/observability/services']
+      interval: 5s
+      timeout: 2s
+      retries: 2
+      start_period: 15s
+
+  prometheus:
+    container_name: 'redish-prometheus'
+    image: 'prom/prometheus:v3.5.4'
+    ports:
+      - '9090:9090'
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - redish-prometheus-data:/prometheus
+    depends_on:
+      redish:
+        condition: service_healthy
+      dashboard:
+        condition: service_healthy
+    healthcheck:
+      # The prometheus image ships wget (not curl); /-/healthy returns 200 when ready.
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:9090/-/healthy || exit 1']
+      interval: 5s
+      timeout: 2s
+      retries: 2
+      start_period: 20s
+
+  grafana:
+    container_name: 'redish-grafana'
+    image: 'grafana/grafana-oss:13.0.2'
+    ports:
+      - '3000:3000'
+    environment:
+      # Local development defaults. Override GRAFANA_ADMIN_USER / GRAFANA_ADMIN_PASSWORD out of band for
+      # any shared or hosted deployment; never commit a real password here.
+      GF_SECURITY_ADMIN_USER: '${GRAFANA_ADMIN_USER:-admin}'
+      GF_SECURITY_ADMIN_PASSWORD: '${GRAFANA_ADMIN_PASSWORD:-admin}'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - redish-grafana-data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ../assets/grafana:/var/lib/grafana/dashboards/redish:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      loki:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:3000/api/health || exit 1']
+      interval: 5s
+      timeout: 2s
+      retries: 2
+      start_period: 30s
+
+volumes:
+  redish-prometheus-data:
+  redish-tempo-data:
+  redish-loki-data:
+  redish-grafana-data:

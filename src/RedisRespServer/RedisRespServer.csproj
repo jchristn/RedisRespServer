@@ -6,7 +6,7 @@
 
 	<PropertyGroup>
 		<Title>Redis RESP Server</Title>
-		<Version>0.1.1</Version>
+		<Version>0.2.0</Version>
 		<ApplicationIcon>logo.ico</ApplicationIcon>
 		<GenerateDocumentationFile>True</GenerateDocumentationFile>
 		<DocumentationFile>RedisRespServer.xml</DocumentationFile>
@@ -19,8 +19,8 @@
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<RepositoryUrl>https://github.com/jchristn/RedisRespServer</RepositoryUrl>
 		<RepositoryType>git</RepositoryType>
-		<PackageTags>redis resp key value store ram caching cache</PackageTags>
-		<PackageReleaseNotes>Alpha release</PackageReleaseNotes>
+		<PackageTags>redis resp key value store ram caching cache opentelemetry telemetry metrics tracing</PackageTags>
+		<PackageReleaseNotes>Built-in OpenTelemetry-compatible metrics and traces (Meter and ActivitySource named RedisRespServer). See TELEMETRY.md.</PackageReleaseNotes>
 		<PackageLicenseFile>LICENSE.md</PackageLicenseFile>
 		<IncludeSymbols>True</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -46,6 +46,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<PackageReference Include="System.Diagnostics.DiagnosticSource" Version="10.0.12" />
 		<PackageReference Include="System.Text.Encoding.CodePages" Version="10.0.11" />
 	</ItemGroup>
 

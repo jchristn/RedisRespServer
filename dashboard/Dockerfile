@@ -17,6 +17,9 @@ RUN npm run build
 # Production stage
 FROM node:20-alpine AS production
 
+# curl backs the container healthcheck
+RUN apk add --no-cache curl
+
 WORKDIR /app
 
 # Copy package files for production dependencies
@@ -29,8 +32,9 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
 
-# Expose port
+# Expose ports: web UI/API and the Prometheus scrape endpoint (telemetry)
 EXPOSE 3002
+EXPOSE 9465
 
 # Run the server
 CMD ["node", "server/index.js"]

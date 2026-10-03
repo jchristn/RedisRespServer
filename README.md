@@ -20,6 +20,7 @@ The motivation behind building this library is to 1) expose an interface for C# 
 - 🧵 **Multi-Client Support** - Handle multiple concurrent client connections
 - 📊 **Data Type Support** - String, Hash, List, Set, SortedSet, JSON, Stream value types
 - 🔐 **Authentication Framework** - Built-in authentication event handling
+- 📈 **Built-in Observability** - OpenTelemetry-compatible metrics and traces from the library (`RedisRespServer` meter and activity source), full metrics, traces, and logs from Redish.Server, and a ready-made Prometheus, Tempo, Loki, and Grafana stack. See [TELEMETRY.md](TELEMETRY.md)
 
 ## Testing and Validation
 
@@ -52,6 +53,28 @@ dotnet run
 ```
 
 This starts a simple Redis server on port 6379 with basic command support.
+
+## Observability
+
+Every component emits telemetry, and `docker/compose.yaml` brings up Redish, the web dashboard, Prometheus,
+Tempo, Loki, and Grafana, all wired together:
+
+```bash
+docker compose -f docker/compose.yaml up -d --build
+```
+
+Then open Grafana at http://localhost:3000 (`admin` / `admin` for local development) and browse the **Redish**
+folder. Its six dashboards cover Overview, Commands, Connections and Protocol, Expiration and Storage, Runtime,
+and Dashboard Backend.
+
+- **Library users:** `RedisRespServer` emits through the .NET base class library only (`Meter` and
+  `ActivitySource` named `RedisRespServer`, constants in `RespTelemetry`). Nothing is exported, and almost nothing
+  is spent, until your host subscribes, for example with Radiant's `settings.Sources.AddMeter(RespTelemetry.MeterName)`.
+- **Redish.Server:** configure the `Telemetry` section of `redish.json` (OTLP endpoint, Prometheus endpoint on port
+  9464, Loki, sampling). It is on by default with loopback addresses, and best-effort: if it cannot start, the server
+  still runs.
+
+[TELEMETRY.md](TELEMETRY.md) lists every metric, span, attribute, configuration key, dashboard, and recommended alert.
 
 ## Core Architecture
 
@@ -314,12 +337,15 @@ dotnet run
 
 ```
 src/
-├── RedisRespServer/           # Core library (RespListener, RespInterface)
-├── Redish.Server/            # Full Redis server implementation  
+├── RedisRespServer/           # Core library (RespListener, RespInterface, RespTelemetry)
+├── Redish.Server/            # Full Redis server implementation (Telemetry/ holds its instrumentation)
 ├── Sample.RedisInterface/    # Basic example server
 ├── Sample.RedisServer/       # Alternative example
-├── Test.StackExchangeRedis/  # Compatibility tests
-└── Test/                     # Additional test utilities
+├── Test.Shared/              # Touchstone test suites (run by Test.Automated, Test.Xunit, Test.Nunit)
+└── Test.StackExchangeRedis/  # Compatibility tests
+dashboard/                    # Web dashboard (React) and its Node.js backend
+docker/                       # compose.yaml (Redish + observability stack), Prometheus, Tempo, Grafana provisioning
+assets/grafana/               # Grafana dashboard JSON
 ```
 
 ## License

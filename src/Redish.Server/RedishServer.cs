@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Diagnostics;
     using System.Globalization;
     using System.Linq;
     using System.Net.Sockets;
@@ -15,6 +16,7 @@
     using Redish.Server.Models;
     using Redish.Server.Settings;
     using Redish.Server.Storage;
+    using Redish.Server.Telemetry;
     using Redish.Server.Utilities;
     using SyslogLogging;
 
@@ -72,6 +74,7 @@
         private SortedSetHandler _SortedSetHandler;
         private JsonHandler _JsonHandler;
         private StreamHandler _StreamHandler;
+        private readonly ServerTelemetrySource _TelemetrySource;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RedishServer"/> class.
@@ -93,6 +96,16 @@
             _Storage = CreateStorage(_Settings.Storage);
             RespListener listener = new RespListener(_Settings.Port);
             _Resp = new RespInterface(listener);
+
+            // Expose state to the observable gauges (keys, clients, build and config facts)
+            _TelemetrySource = new ServerTelemetrySource(
+                _Settings.Storage.Mode.ToString(),
+                _Settings.RedisCompatibilityVersion,
+                _Settings.DatabaseCount,
+                _StartUtc,
+                () => _Storage.Count,
+                () => _ClientInfos.Values.Select(c => c.RespVersion).ToList());
+            RedishInstrumentation.RegisterServer(_TelemetrySource);
 
             // Initialize handler instances
             _SetHandler = new SetHandler(_Logging, _Storage);
@@ -273,8 +286,10 @@
         /// </remarks>
         public void Dispose()
         {
+            RedishInstrumentation.UnregisterServer(_TelemetrySource);
             Stop();
             _Resp?.Dispose();
+            _Storage?.Dispose();
         }
 
         private async void OnArrayReceived(object? sender, RespDataReceivedEventArgs e)
@@ -472,6 +487,7 @@
 
             string command = commandArgs[0].ToUpperInvariant();
             string response;
+            byte[]? binaryResponse = null;
 
             // Track client activity
             if (_ClientInfos.TryGetValue(clientGuid, out ClientInfo activityInfo))
@@ -479,6 +495,18 @@
                 activityInfo.LastActivityUtc = DateTime.UtcNow;
                 activityInfo.LastCommand = command;
             }
+
+            // Telemetry: one span per command (child of the library's resp.dispatch span) with execute and respond stages.
+            string operation = RedishInstrumentation.NormalizeOperation(command);
+            long commandStart = Stopwatch.GetTimestamp();
+            Activity? commandActivity = RedishInstrumentation.StartCommand(operation, clientGuid, commandArgs.Length - 1);
+            string outcome = RedishTelemetry.OutcomeOk;
+            string? errorType = null;
+            Exception? failure = null;
+            int responseBytes = 0;
+            bool executeOpen = true;
+            long stageStart = Stopwatch.GetTimestamp();
+            Activity? stageActivity = RedishInstrumentation.StartStage(RedishTelemetry.StageExecute);
 
             try
             {
@@ -506,9 +534,10 @@
                             echoBytes.CopyTo(respResponse, lengthPrefix.Length);
                             terminator.CopyTo(respResponse, lengthPrefix.Length + echoBytes.Length);
                             
-                            await SendBinaryResponse(clientGuid, respResponse, cancellationToken).ConfigureAwait(false);
+                            // Sent as raw bytes below, skipping the string reply path
+                            binaryResponse = respResponse;
+                            response = string.Empty;
                             _Logging.Debug(_Header + $"executed: ECHO (binary preserved) -> {echoBytes.Length} bytes");
-                            return; // Skip the normal response handling since we sent binary response
                         }
                         else
                         {
@@ -854,20 +883,44 @@
 
                     default:
                         response = $"-ERR unknown command '{command}'\r\n";
+                        outcome = RedishTelemetry.OutcomeUnknownCommand;
                         _Logging.Debug(_Header + $"unknown command: {command}");
                         break;
                 }
 
-                await SendStringResponse(clientGuid, response, cancellationToken).ConfigureAwait(false);
+                executeOpen = false;
+                RedishInstrumentation.StageCompleted(stageActivity, RedishTelemetry.StageExecute, operation, stageStart, null);
+
+                stageStart = Stopwatch.GetTimestamp();
+                stageActivity = RedishInstrumentation.StartStage(RedishTelemetry.StageRespond);
+                responseBytes = binaryResponse != null
+                    ? await SendBinaryResponse(clientGuid, binaryResponse, cancellationToken).ConfigureAwait(false)
+                    : await SendStringResponse(clientGuid, response, cancellationToken).ConfigureAwait(false);
+                RedishInstrumentation.StageCompleted(stageActivity, RedishTelemetry.StageRespond, operation, stageStart, null);
+
+                errorType = RedishInstrumentation.ErrorReplyCode(response);
+                if (errorType != null && outcome == RedishTelemetry.OutcomeOk) outcome = RedishTelemetry.OutcomeError;
+                RedishInstrumentation.RecordLookup(operation, response);
             }
             catch (Exception ex)
             {
+                if (executeOpen) RedishInstrumentation.StageCompleted(stageActivity, RedishTelemetry.StageExecute, operation, stageStart, ex);
+                else RedishInstrumentation.StageCompleted(stageActivity, RedishTelemetry.StageRespond, operation, stageStart, ex);
+
+                outcome = RedishTelemetry.OutcomeException;
+                errorType = ex.GetType().Name;
+                failure = ex;
+
                 _Logging.Warn(_Header + $"error processing command{Environment.NewLine}{ex.ToString()}");
-                await SendStringResponse(clientGuid, "-ERR internal server error\r\n", cancellationToken).ConfigureAwait(false);
+                responseBytes = await SendStringResponse(clientGuid, "-ERR internal server error\r\n", cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                RedishInstrumentation.CommandCompleted(commandActivity, operation, commandStart, outcome, errorType, responseBytes, failure);
             }
         }
 
-        private async Task SendStringResponse(
+        private async Task<int> SendStringResponse(
             Guid clientGuid, 
             string response,
             CancellationToken cancellationToken = default)
@@ -883,18 +936,23 @@
                     
                     // Add small delay to prevent overwhelming the client
                     await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+                    return data.Length;
                 }
                 else
                 {
+                    RedishInstrumentation.ResponseFailed(RedishTelemetry.ErrorClientGone);
                     _Logging.Debug(_Header + $"client {clientGuid} not found or disconnected");
+                    return 0;
                 }
             }
             catch (Exception ex)
             {
+                RedishInstrumentation.ResponseFailed(ex.GetType().Name);
                 _Logging.Warn(_Header + $"error sending response to client {clientGuid}{Environment.NewLine}{ex.ToString()}");
                 // Remove disconnected client
                 _Clients.TryRemove(clientGuid, out _);
                 _ClientInfos.TryRemove(clientGuid, out _);
+                return 0;
             }
         }
 
@@ -953,7 +1011,7 @@
             }
         }
 
-        private async Task SendBinaryResponse(
+        private async Task<int> SendBinaryResponse(
             Guid clientGuid, 
             byte[] binaryData,
             CancellationToken cancellationToken = default)
@@ -968,18 +1026,23 @@
                     
                     // Add small delay to prevent overwhelming the client
                     await Task.Delay(1, cancellationToken).ConfigureAwait(false);
+                    return binaryData.Length;
                 }
                 else
                 {
+                    RedishInstrumentation.ResponseFailed(RedishTelemetry.ErrorClientGone);
                     _Logging.Debug(_Header + $"client {clientGuid} not found or disconnected");
+                    return 0;
                 }
             }
             catch (Exception ex)
             {
+                RedishInstrumentation.ResponseFailed(ex.GetType().Name);
                 _Logging.Warn(_Header + $"error sending binary response to client {clientGuid}{Environment.NewLine}{ex.ToString()}");
                 // Remove disconnected client
                 _Clients.TryRemove(clientGuid, out _);
                 _ClientInfos.TryRemove(clientGuid, out _);
+                return 0;
             }
         }
 
@@ -998,6 +1061,7 @@
                 if (_Resp.Authenticate != null)
                 {
                     bool authSuccess = _Resp.Authenticate(null, password);
+                    RedishInstrumentation.AuthAttempt(authSuccess ? RedishTelemetry.OutcomeSuccess : RedishTelemetry.OutcomeFailure);
                     if (authSuccess)
                     {
                         _Logging.Debug(_Header + $"executed: AUTH [password] -> OK (authenticated)");
@@ -1011,6 +1075,7 @@
                 }
                 else
                 {
+                    RedishInstrumentation.AuthAttempt(RedishTelemetry.OutcomeNotRequired);
                     _Logging.Debug(_Header + $"executed: AUTH [password] -> OK (no authentication required)");
                     return "+OK\r\n";
                 }
@@ -1025,6 +1090,7 @@
                 if (_Resp.Authenticate != null)
                 {
                     bool authSuccess = _Resp.Authenticate(username, password);
+                    RedishInstrumentation.AuthAttempt(authSuccess ? RedishTelemetry.OutcomeSuccess : RedishTelemetry.OutcomeFailure);
                     if (authSuccess)
                     {
                         _Logging.Debug(_Header + $"executed: AUTH {username} [password] -> OK (authenticated)");
@@ -1038,12 +1104,14 @@
                 }
                 else
                 {
+                    RedishInstrumentation.AuthAttempt(RedishTelemetry.OutcomeNotRequired);
                     _Logging.Debug(_Header + $"executed: AUTH {username} [password] -> OK (no authentication required)");
                     return "+OK\r\n";
                 }
             }
             else
             {
+                RedishInstrumentation.AuthAttempt(RedishTelemetry.OutcomeInvalidArguments);
                 return "-ERR wrong number of arguments for 'auth' command\r\n";
             }
         }

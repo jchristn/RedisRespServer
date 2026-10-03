@@ -6,6 +6,7 @@
     using System.Threading;
     using RedisResp;
     using Redish.Server.Models;
+    using Redish.Server.Telemetry;
 
     /// <summary>
     /// Thread-safe dictionary-based implementation of Redis storage.
@@ -62,7 +63,7 @@
                                 // Double-check after acquiring write lock
                                 if (_Storage.TryGetValue(key, out value) && value.IsExpired)
                                 {
-                                    _Storage.Remove(key);
+                                    if (_Storage.Remove(key)) RedishInstrumentation.KeysExpired(1, RedishTelemetry.TriggerPassive);
                                 }
                                 return null;
                             }
@@ -181,7 +182,7 @@
                             // Double-check after acquiring write lock
                             if (_Storage.TryGetValue(key, out value) && value.IsExpired)
                             {
-                                _Storage.Remove(key);
+                                if (_Storage.Remove(key)) RedishInstrumentation.KeysExpired(1, RedishTelemetry.TriggerPassive);
                                 value = null;
                                 return false;
                             }
@@ -200,6 +201,29 @@
             {
                 if (_Lock.IsReadLockHeld)
                     _Lock.ExitReadLock();
+            }
+        }
+
+        /// <summary>
+        /// Returns the raw stored entry, including an expired one, without removing it, so the expiration
+        /// sweep performs (and accounts for) the removal itself.
+        /// </summary>
+        /// <param name="key">The key to look up.</param>
+        /// <param name="value">The stored value, or null.</param>
+        /// <returns>True if the key is present.</returns>
+        protected override bool TryGetValueForSweep(string key, out RedisValue value)
+        {
+            value = null;
+            if (string.IsNullOrEmpty(key)) return false;
+
+            _Lock.EnterReadLock();
+            try
+            {
+                return _Storage.TryGetValue(key, out value);
+            }
+            finally
+            {
+                _Lock.ExitReadLock();
             }
         }
 

@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Radiant" Version="0.1.2" />
     <PackageReference Include="SerializationHelper" Version="2.0.3" />
     <PackageReference Include="SyslogLogging" Version="2.2.1" />
   </ItemGroup>

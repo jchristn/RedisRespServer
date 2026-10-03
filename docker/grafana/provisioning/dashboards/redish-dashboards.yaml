@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Redish'
+    orgId: 1
+    folder: 'Redish'
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards/redish

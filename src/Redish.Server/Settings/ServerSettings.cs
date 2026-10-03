@@ -55,6 +55,15 @@ namespace Redish.Server.Settings
         }
 
         /// <summary>
+        /// Telemetry settings (metrics, traces, and logs). Never null; assigning null restores the defaults.
+        /// </summary>
+        public TelemetrySettings Telemetry
+        {
+            get => _Telemetry;
+            set => _Telemetry = value ?? new TelemetrySettings();
+        }
+
+        /// <summary>
         /// Gets or sets the Redis compatibility version to report in INFO commands.
         /// </summary>
         /// <value>The Redis version string (default: "7.0.0").</value>
@@ -92,6 +101,7 @@ namespace Redish.Server.Settings
 
         private LoggingSettings _Logging = new LoggingSettings();
         private StorageSettings _Storage = new StorageSettings();
+        private TelemetrySettings _Telemetry = new TelemetrySettings();
         private int _Port = 6379;
 
         /// <summary>

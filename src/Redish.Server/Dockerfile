@@ -25,7 +25,8 @@ COPY --from=publish /app/publish .
 # Create directories
 RUN mkdir -p /app/logs
 
-# Expose port
+# Expose ports: RESP and the Prometheus scrape endpoint (telemetry)
 EXPOSE 6379
+EXPOSE 9464
 
 ENTRYPOINT ["dotnet", "Redish.Server.dll"]

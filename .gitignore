@@ -339,3 +339,5 @@ paket-files/
 __pycache__/
 *.pyc
  
+# Docker compose runtime logs
+docker/logs/

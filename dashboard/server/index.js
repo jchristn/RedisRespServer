@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { existsSync } from 'fs';
+import { createTelemetry } from './telemetry.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -11,6 +12,13 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+// Telemetry: HTTP server spans/metrics and Redis client spans/metrics (see server/telemetry.js, TELEMETRY.md)
+const telemetry = createTelemetry();
+if (telemetry.enabled) {
+  console.log(`Telemetry enabled${telemetry.scrapeUrl ? `, metrics at ${telemetry.scrapeUrl}` : ''}`);
+}
+
+app.use(telemetry.httpMiddleware);
 app.use(cors());
 app.use(express.json());
 
@@ -22,6 +30,7 @@ if (existsSync(distPath)) {
 
 // Store Redis connections per session/connection string
 const connections = new Map();
+telemetry.setPoolSizeProvider(() => connections.size);
 
 function getRedisClient(connectionString) {
   if (!connectionString) {
@@ -60,6 +69,7 @@ function getRedisClient(connectionString) {
     retryStrategy: () => null, // Don't auto-retry
   });
 
+  telemetry.instrumentRedisClient(client);
   connections.set(connectionString, client);
   return client;
 }
@@ -78,6 +88,32 @@ function withRedis(req, res, next) {
     res.status(500).json({ error: err.message });
   }
 }
+
+// External services (Grafana and the observability stack) shown on the Overview page. URLs are the
+// browser-reachable, host-published addresses; credentials are local development defaults.
+function externalService(name, envPrefix, defaultUrl, description, username, password) {
+  const url = process.env[`${envPrefix}_URL`] ?? defaultUrl;
+  if (!url) return null;
+  return {
+    name,
+    url,
+    description,
+    username: process.env[`${envPrefix}_USERNAME`] ?? username,
+    password: process.env[`${envPrefix}_PASSWORD`] ?? password,
+  };
+}
+
+app.get('/api/observability/services', (req, res) => {
+  const services = [
+    externalService('Grafana', 'GRAFANA', 'http://localhost:3000', 'Dashboards (Redish folder): overview, commands, connections, expiration, runtime, dashboard backend', 'admin', 'admin'),
+    externalService('Prometheus', 'PROMETHEUS', 'http://localhost:9090', 'Metrics store and PromQL', null, null),
+    externalService('Tempo', 'TEMPO', 'http://localhost:3200', 'Trace store API (browse traces from Grafana Explore)', null, null),
+    externalService('Loki', 'LOKI', 'http://localhost:3100', 'Log store API (browse logs from Grafana Explore)', null, null),
+    externalService('Redish metrics', 'REDISH_METRICS', 'http://localhost:9464/metrics', 'Redish server Prometheus scrape endpoint', null, null),
+    externalService('Dashboard metrics', 'DASHBOARD_METRICS', 'http://localhost:9465/metrics', 'Dashboard backend Prometheus scrape endpoint', null, null),
+  ].filter((s) => s !== null && s.url !== '');
+  res.json(services);
+});
 
 // Health check / ping
 app.get('/api/ping', withRedis, async (req, res) => {
@@ -593,14 +629,18 @@ function parseCommand(command) {
   return parts;
 }
 
-// Clean up connections on exit
-process.on('SIGINT', () => {
+// Clean up connections and flush telemetry on exit
+async function shutdown() {
   console.log('\nShutting down...');
   for (const client of connections.values()) {
     client.disconnect();
   }
+  await telemetry.shutdown();
   process.exit(0);
-});
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // Serve index.html for client-side routing (SPA fallback)
 if (existsSync(distPath)) {
