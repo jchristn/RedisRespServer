@@ -2,6 +2,17 @@
 
 Notes from current version:
 
+v0.2.1
+- Dependency updates:
+  - RedisRespServer: System.Text.Encoding.CodePages 10.0.11 -> 10.0.12.
+  - Redish.Server: SerializationHelper 2.0.3 -> 2.1.0, SyslogLogging 2.2.1 -> 2.3.1.
+  - Tests: Touchstone.Core, Touchstone.Cli, Touchstone.XunitAdapter, and Touchstone.NunitAdapter 0.1.12 -> 0.2.0;
+    Microsoft.NET.Test.Sdk 18.9.0 -> 18.10.1; NUnit 4.5.1 -> 5.0.0; NUnit3TestAdapter 6.2.0 -> 6.3.0;
+    StackExchange.Redis 3.1.13 -> 3.3.1; Microsoft.Extensions.Logging.Console 10.0.11 -> 10.0.12.
+- Test client fix: `RespRawClient` no longer cancels a socket read when a read times out. The read stays
+  pending and its bytes go to the next call. Before, a cancelled read that raced with arriving data could drop
+  that data, so the pipelined-replies test failed intermittently when the server stalled under load.
+
 v0.2.0
 - Observability for every component. See TELEMETRY.md for the full catalog.
   - RedisRespServer library: a Meter and ActivitySource named `RedisRespServer` (public names in `RespTelemetry`).

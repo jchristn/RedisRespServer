@@ -36,6 +36,10 @@ namespace Test.Shared.Infrastructure
 
         private TcpClient _TcpClient;
         private NetworkStream _Stream;
+        private readonly byte[] _ReadBuffer = new byte[65536];
+        private Task<int> _PendingRead = null;
+        private int _BufferedOffset = 0;
+        private int _BufferedCount = 0;
 
         #endregion
 
@@ -106,25 +110,14 @@ namespace Test.Shared.Infrastructure
 
             while (DateTime.UtcNow < deadline)
             {
-                using (CancellationTokenSource cts = new CancellationTokenSource(timeout))
-                {
-                    int read;
-                    try
-                    {
-                        read = await _Stream.ReadAsync(one, 0, 1, cts.Token).ConfigureAwait(false);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return null;
-                    }
+                int read = await ReadIntoAsync(one, 0, 1, timeout).ConfigureAwait(false);
+                if (read < 0) return null;
+                if (read == 0) return sb.Length == 0 ? null : sb.ToString();
 
-                    if (read == 0) return sb.Length == 0 ? null : sb.ToString();
-
-                    char c = (char)one[0];
-                    if (c == '\r') continue;
-                    if (c == '\n') return sb.ToString();
-                    sb.Append(c);
-                }
+                char c = (char)one[0];
+                if (c == '\r') continue;
+                if (c == '\n') return sb.ToString();
+                sb.Append(c);
             }
 
             return sb.Length == 0 ? null : sb.ToString();
@@ -140,17 +133,8 @@ namespace Test.Shared.Infrastructure
             StringBuilder sb = new StringBuilder();
             byte[] buffer = new byte[4096];
 
-            using (CancellationTokenSource cts = new CancellationTokenSource(timeout))
-            {
-                try
-                {
-                    int read = await _Stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
-                    if (read > 0) sb.Append(Encoding.Latin1.GetString(buffer, 0, read));
-                }
-                catch (OperationCanceledException)
-                {
-                }
-            }
+            int read = await ReadIntoAsync(buffer, 0, buffer.Length, timeout).ConfigureAwait(false);
+            if (read > 0) sb.Append(Encoding.Latin1.GetString(buffer, 0, read));
 
             return sb.ToString();
         }
@@ -220,24 +204,65 @@ namespace Test.Shared.Infrastructure
         /// <returns>True if data was read; otherwise, false.</returns>
         private async Task<bool> ReadChunk(byte[] buffer, StringBuilder sb, TimeSpan timeout)
         {
-            using (CancellationTokenSource cts = new CancellationTokenSource(timeout))
+            try
             {
+                int read = await ReadIntoAsync(buffer, 0, buffer.Length, timeout).ConfigureAwait(false);
+                if (read <= 0) return false;
+                sb.Append(Encoding.Latin1.GetString(buffer, 0, read));
+                return true;
+            }
+            catch (System.IO.IOException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Reads up to <paramref name="count"/> bytes, waiting at most <paramref name="timeout"/>.
+        /// </summary>
+        /// <param name="dest">The destination buffer.</param>
+        /// <param name="offset">The offset into the destination buffer.</param>
+        /// <param name="count">The maximum number of bytes to read.</param>
+        /// <param name="timeout">How long to wait for data.</param>
+        /// <returns>The number of bytes read, 0 when the socket closed, or -1 when the wait timed out.</returns>
+        /// <remarks>
+        /// A timed-out socket read is left pending rather than cancelled, and its bytes are handed to the next
+        /// call. Cancelling a socket read that races with arriving data can drop that data, which corrupts
+        /// streamed replies when the server stalls longer than the caller's timeout.
+        /// </remarks>
+        private async Task<int> ReadIntoAsync(byte[] dest, int offset, int count, TimeSpan timeout)
+        {
+            if (_BufferedCount == 0)
+            {
+                if (_PendingRead == null) _PendingRead = _Stream.ReadAsync(_ReadBuffer, 0, _ReadBuffer.Length);
+
+                using (CancellationTokenSource delayCts = new CancellationTokenSource())
+                {
+                    Task completed = await Task.WhenAny(_PendingRead, Task.Delay(timeout, delayCts.Token)).ConfigureAwait(false);
+                    if (completed != _PendingRead) return -1;
+                    delayCts.Cancel();
+                }
+
+                int read;
                 try
                 {
-                    int read = await _Stream.ReadAsync(buffer, 0, buffer.Length, cts.Token).ConfigureAwait(false);
-                    if (read <= 0) return false;
-                    sb.Append(Encoding.Latin1.GetString(buffer, 0, read));
-                    return true;
+                    read = await _PendingRead.ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                finally
                 {
-                    return false;
+                    _PendingRead = null;
                 }
-                catch (System.IO.IOException)
-                {
-                    return false;
-                }
+
+                if (read <= 0) return 0;
+                _BufferedOffset = 0;
+                _BufferedCount = read;
             }
+
+            int copied = Math.Min(count, _BufferedCount);
+            Buffer.BlockCopy(_ReadBuffer, _BufferedOffset, dest, offset, copied);
+            _BufferedOffset += copied;
+            _BufferedCount -= copied;
+            return copied;
         }
 
         #endregion

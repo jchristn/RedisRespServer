@@ -330,8 +330,9 @@ dotnet run
 ## Build Requirements
 
 - .NET 8.0 SDK
-- No external dependencies for core library
-- Redish.Server uses SerializationHelper and SyslogLogging packages
+- Core library depends only on Microsoft BCL packages (System.Diagnostics.DiagnosticSource, System.Text.Encoding.CodePages)
+- Redish.Server uses SerializationHelper (2.1.0), SyslogLogging (2.3.1), and Radiant (0.1.2)
+- Tests use Touchstone 0.2.0 with xUnit and NUnit 5 adapters
 
 ## Project Structure
 
