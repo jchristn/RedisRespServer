@@ -66,6 +66,7 @@
         private readonly StorageBase _Storage;
         private readonly ConcurrentDictionary<Guid, TcpClient> _Clients = new();
         private readonly ConcurrentDictionary<Guid, ClientInfo> _ClientInfos = new();
+        private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _ClientWriteLocks = new();
         private readonly DateTime _StartUtc = DateTime.UtcNow;
         private long _NextClientId = 1;
         private LoggingModule? _Logging;
@@ -165,6 +166,7 @@
 
             _Resp.Listener.Stop();
             _Clients.Clear();
+            _ClientWriteLocks.Clear();
             _Logging.Info(_Header + "Redis Interface Server stopped.");
         }
 
@@ -350,6 +352,7 @@
             RedisResp.ClientInfo? clientInfo = _Resp.Listener.RetrieveClientByGuid(e.GUID);
             if (clientInfo?.TcpClient != null)
             {
+                _ClientWriteLocks.TryAdd(e.GUID, new SemaphoreSlim(1, 1));
                 _Clients[e.GUID] = clientInfo.TcpClient;
                 
                 // Create client info entry
@@ -376,6 +379,7 @@
             
             _Clients.TryRemove(e.GUID, out _);
             _ClientInfos.TryRemove(e.GUID, out _);
+            _ClientWriteLocks.TryRemove(e.GUID, out _);
         }
 
         private void OnErrorOccurred(object? sender, ErrorEventArgs e)
@@ -920,40 +924,12 @@
             }
         }
 
-        private async Task<int> SendStringResponse(
+        private Task<int> SendStringResponse(
             Guid clientGuid, 
             string response,
             CancellationToken cancellationToken = default)
         {
-            try
-            {
-                if (_Clients.TryGetValue(clientGuid, out TcpClient client) && client.Connected)
-                {
-                    byte[] data = System.Text.Encoding.UTF8.GetBytes(response);
-                    NetworkStream stream = client.GetStream();
-                    await stream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
-                    await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                    
-                    // Add small delay to prevent overwhelming the client
-                    await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-                    return data.Length;
-                }
-                else
-                {
-                    RedishInstrumentation.ResponseFailed(RedishTelemetry.ErrorClientGone);
-                    _Logging.Debug(_Header + $"client {clientGuid} not found or disconnected");
-                    return 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                RedishInstrumentation.ResponseFailed(ex.GetType().Name);
-                _Logging.Warn(_Header + $"error sending response to client {clientGuid}{Environment.NewLine}{ex.ToString()}");
-                // Remove disconnected client
-                _Clients.TryRemove(clientGuid, out _);
-                _ClientInfos.TryRemove(clientGuid, out _);
-                return 0;
-            }
+            return WriteResponse(clientGuid, System.Text.Encoding.UTF8.GetBytes(response), "response", cancellationToken);
         }
 
         private RespVersionEnum GetClientRespVersion(Guid clientGuid)
@@ -1011,22 +987,41 @@
             }
         }
 
-        private async Task<int> SendBinaryResponse(
+        private Task<int> SendBinaryResponse(
             Guid clientGuid, 
             byte[] binaryData,
             CancellationToken cancellationToken = default)
         {
+            return WriteResponse(clientGuid, binaryData, "binary response", cancellationToken);
+        }
+
+        private async Task<int> WriteResponse(
+            Guid clientGuid,
+            byte[] data,
+            string description,
+            CancellationToken cancellationToken)
+        {
             try
             {
-                if (_Clients.TryGetValue(clientGuid, out TcpClient client) && client.Connected)
+                // Command handlers run concurrently (the listener raises events without awaiting them), so writes
+                // to one client are serialized here; otherwise pipelined replies could interleave or reorder.
+                // TCP flow control already applies backpressure when the client is slow to read.
+                if (_Clients.TryGetValue(clientGuid, out TcpClient client)
+                    && _ClientWriteLocks.TryGetValue(clientGuid, out SemaphoreSlim writeLock)
+                    && client.Connected)
                 {
-                    NetworkStream stream = client.GetStream();
-                    await stream.WriteAsync(binaryData, 0, binaryData.Length, cancellationToken).ConfigureAwait(false);
-                    await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                    
-                    // Add small delay to prevent overwhelming the client
-                    await Task.Delay(1, cancellationToken).ConfigureAwait(false);
-                    return binaryData.Length;
+                    await writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    try
+                    {
+                        NetworkStream stream = client.GetStream();
+                        await stream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
+                        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                        return data.Length;
+                    }
+                    finally
+                    {
+                        writeLock.Release();
+                    }
                 }
                 else
                 {
@@ -1038,10 +1033,11 @@
             catch (Exception ex)
             {
                 RedishInstrumentation.ResponseFailed(ex.GetType().Name);
-                _Logging.Warn(_Header + $"error sending binary response to client {clientGuid}{Environment.NewLine}{ex.ToString()}");
+                _Logging.Warn(_Header + $"error sending {description} to client {clientGuid}{Environment.NewLine}{ex.ToString()}");
                 // Remove disconnected client
                 _Clients.TryRemove(clientGuid, out _);
                 _ClientInfos.TryRemove(clientGuid, out _);
+                _ClientWriteLocks.TryRemove(clientGuid, out _);
                 return 0;
             }
         }

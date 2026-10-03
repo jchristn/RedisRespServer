@@ -25,6 +25,10 @@ v0.2.0
     and six provisioned dashboards in a Redish folder (`assets/grafana/`). `docker/update.sh` and `update.bat`
     refresh the stack.
 - Telemetry test suites for the library, the server, and the dashboard backend.
+- Redish.Server no longer sleeps 1 ms after every reply. The delay ran after the reply was flushed, so it
+  never throttled anything; it only held each handler open and inflated the `respond` stage. Writes to one
+  client are now serialized with a per-client lock, so pipelined replies cannot interleave or reorder when
+  a write has to wait. The sample servers drop the same delay.
 
 v0.1.0
 - Initial alpha release

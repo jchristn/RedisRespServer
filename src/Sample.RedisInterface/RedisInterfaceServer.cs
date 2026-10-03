@@ -840,9 +840,6 @@ namespace Sample.RedisInterface
                     var stream = client.GetStream();
                     await stream.WriteAsync(data, 0, data.Length, cancellationToken).ConfigureAwait(false);
                     await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                    
-                    // Add small delay to prevent overwhelming the client
-                    await Task.Delay(1, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -925,9 +922,6 @@ namespace Sample.RedisInterface
                     var stream = client.GetStream();
                     await stream.WriteAsync(binaryData, 0, binaryData.Length, cancellationToken).ConfigureAwait(false);
                     await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                    
-                    // Add small delay to prevent overwhelming the client
-                    await Task.Delay(1, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {

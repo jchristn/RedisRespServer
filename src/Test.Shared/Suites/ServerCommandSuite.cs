@@ -2,6 +2,7 @@ namespace Test.Shared.Suites
 {
     using System;
     using System.Collections.Generic;
+    using System.Text;
     using System.Threading.Tasks;
     using Test.Shared.Infrastructure;
     using Touchstone.Core;
@@ -166,6 +167,42 @@ namespace Test.Shared.Suites
                         await ServerFixture.SendCommandAsync(c1, "SET", "mc", "fromC1");
                         Check.Equal("$6\r\nfromC1\r\n", await ServerFixture.SendCommandAsync(c2, "GET", "mc"));
                     }
+                }),
+
+                Cases.Async(SuiteId, "pipelined-replies-ordered", "Pipelined commands with large and small replies are answered in order without interleaving", async ct =>
+                {
+                    await WithClient(async c =>
+                    {
+                        string big = new string('x', 64 * 1024);
+                        StringBuilder request = new StringBuilder(ServerFixture.BuildCommand("SET", "pipe-big", big));
+                        StringBuilder expected = new StringBuilder("+OK\r\n");
+                        for (int i = 0; i < 200; i++)
+                        {
+                            if (i % 20 == 0)
+                            {
+                                request.Append(ServerFixture.BuildCommand("GET", "pipe-big"));
+                                expected.Append("$" + big.Length + "\r\n" + big + "\r\n");
+                            }
+                            else
+                            {
+                                string payload = "m" + i;
+                                request.Append(ServerFixture.BuildCommand("ECHO", payload));
+                                expected.Append("$" + payload.Length + "\r\n" + payload + "\r\n");
+                            }
+                        }
+
+                        await c.SendAsync(request.ToString());
+
+                        StringBuilder received = new StringBuilder();
+                        DateTime deadline = DateTime.UtcNow.AddSeconds(20);
+                        while (received.Length < expected.Length && DateTime.UtcNow < deadline)
+                        {
+                            received.Append(await c.ReadAvailableAsync(TimeSpan.FromSeconds(2)));
+                        }
+
+                        Check.Equal(expected.Length, received.Length, "total reply length");
+                        Check.True(expected.ToString() == received.ToString(), "pipelined replies arrived out of order or interleaved");
+                    });
                 })
             };
 
